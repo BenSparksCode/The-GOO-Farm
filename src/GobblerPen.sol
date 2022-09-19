@@ -48,7 +48,6 @@ contract GobblerPen is ERC20, ERC1155Holder {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    // TODO consider adding 18 decimals to multiplier for share calculations
     function deposit(uint256 gobblerID, address receiver) public returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
 
@@ -126,8 +125,10 @@ contract GobblerPen is ERC20, ERC1155Holder {
         return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
     }
 
+    // Returns multiplier with 18 decimals
+    // TODO check Gobblers doesn't already include 18 decimals in multiplier
     function getMultiplierOfGobbler(uint256 gobblerID) public view returns (uint256) {
         // TODO implement once Gobbler contract is available
-        return 15;
+        return 15e18;
     }
 }
