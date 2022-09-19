@@ -8,4 +8,4 @@ If you own a Gobbler, bring it on down to the `GobblerPen`. This is a modified E
 
 Now that our farm has some GOO and some Gobblers, we're ready to begin production. Head on over to the `Gooptimizooor`, where our top scientists are hard at work, distributing GOO across the Gobblers to optimize production.
 
-At some point in the future, we'll launch the GOO Farm governance token, or `GOOF`, via an airdrop. This is because we're too lazy to code a liquidity mining thing right now. With GOOF, you'll finally be able to do all your favourite things in DeFi - like argue on governance forums about turning on the protocol fee switch. Good luck with that one.
+At some point in the future, we'll launch the GOO Farm governance token, or `GOOF`, via an airdrop. This is because we're too lazy to code a whole liquidity mining thing right now. With GOOF, you'll finally be able to do all your favourite DeFi things with The GOO Farm - like argue on governance forums about turning on the protocol fee switch. Good luck with that one.
