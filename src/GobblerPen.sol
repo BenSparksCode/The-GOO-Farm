@@ -17,7 +17,7 @@ contract GobblerPen is ERC20, ERC1155Holder {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
+    event Deposit(address indexed caller, address indexed owner, uint256 gobblerID, uint256 multiplier, uint256 shares);
 
     event Withdraw(address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares);
 
@@ -41,29 +41,19 @@ contract GobblerPen is ERC20, ERC1155Holder {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(uint256 assets, address receiver) public virtual returns (uint256 shares) {
+    function deposit(uint256 gobblerID, address receiver) public virtual returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        // TODO change to NFT
-        // Need to transfer before minting or ERC777s could reenter.
-        // asset.safeTransferFrom(msg.sender, address(this), assets);
+        uint256 multiplier = getMultiplierOfGobbler(gobblerID);
 
-        _mint(receiver, shares);
+        require((shares = previewDeposit(multiplier)) != 0, "ZERO_SHARES");
 
-        emit Deposit(msg.sender, receiver, assets, shares);
-    }
-
-    function mint(uint256 shares, address receiver) public virtual returns (uint256 assets) {
-        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
-
-        // TODO change to NFT
-        // Need to transfer before minting or ERC777s could reenter.
-        // asset.safeTransferFrom(msg.sender, address(this), assets);
+        // TODO send to Gooptimizooor.sol instead of here
+        GOBBLER.safeTransferFrom(msg.sender, address(this), gobblerID, 1, "");
 
         _mint(receiver, shares);
 
-        emit Deposit(msg.sender, receiver, assets, shares);
+        emit Deposit(msg.sender, receiver, gobblerID, multiplier, shares);
     }
 
     function withdraw(
@@ -87,28 +77,6 @@ contract GobblerPen is ERC20, ERC1155Holder {
         // asset.safeTransfer(receiver, assets);
     }
 
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) public virtual returns (uint256 assets) {
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
-
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
-        }
-
-        // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
-
-        _burn(owner, shares);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-
-        // TODO change to NFT
-        // asset.safeTransfer(receiver, assets);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -119,6 +87,8 @@ contract GobblerPen is ERC20, ERC1155Holder {
         return multiplierSum;
     }
 
+    // Modified from ERC4626.
+    // assets represents new multiplier number of Gobbler deposited.
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
@@ -151,5 +121,8 @@ contract GobblerPen is ERC20, ERC1155Holder {
         return convertToAssets(shares);
     }
 
-    // TODO add on1155Received callback to
+    function getMultiplierOfGobbler(uint256 gobblerID) public view returns (uint256) {
+        // TODO implement once Gobbler contract is available
+        return 15;
+    }
 }
