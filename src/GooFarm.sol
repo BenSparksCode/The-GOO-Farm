@@ -7,6 +7,8 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 contract GooFarm is ERC4626 {
     constructor(ERC20 goo) ERC4626(goo, "Farmed Goo", "xGOO") {}
 
+    // TODO on deposit, include fee amount that mints protocol shares of GOO pool. 0 until fee switch.
+
     // Returns total GOO (less Gobbler and protocol fees) in the protocol
     function totalAssets() public view override returns (uint256) {
         // TODO
