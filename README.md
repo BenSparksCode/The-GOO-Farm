@@ -1,26 +1,7 @@
-# foundry-template • [![CI](https://github.com/transmissions11/foundry-template/actions/workflows/tests.yml/badge.svg)](https://github.com/transmissions11/foundry-template/actions/workflows/tests.yml)
+# The GOO Farm
 
-Streamlined template for getting started with Foundry and Solmate.
+Bring your GOO to the `GooFarm` contract, to grow your GOO like a professional GOO farmer. This is an ERC4626 vault so you get shares in proportion to your GOO deposit and will be able to burn them to withdraw total accumulated GOO.
 
-## Contributing
+If you own a Gobbler, bring it on down to the `GobblerPen`. This is a modified ERC4626 vault, where you get shares in proportion to the multiplier of each Gobbler you bring to the Pen. A small cut of all GOO production on the farm is set aside for the fine, hardworking Gobblerfolk in the Pen.
 
-You will need a copy of [Foundry](https://github.com/foundry-rs/foundry) installed before proceeding. See the [installation guide](https://github.com/foundry-rs/foundry#installation) for details.
-
-### Setup
-
-```sh
-git clone https://github.com/transmissions11/foundry-template.git
-cd foundry-template
-```
-
-### Run Tests
-
-```sh
-forge test
-```
-
-### Update Gas Snapshots
-
-```sh
-forge snapshot
-```
+Now that our farm has some GOO and some Gobblers, we're ready to begin production. Head on over to the `Gooptimizooor`, where our top scientists are hard at work, distributing GOO across the Gobblers to optimize production.
