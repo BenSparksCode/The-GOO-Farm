@@ -3,13 +3,14 @@ pragma solidity 0.8.15;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {ERC1155} from "solmate/tokens/ERC1155.sol";
+import {ERC1155Holder} from "openzeppelin/token/ERC1155/utils/ERC1155Holder.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 // GobblerPen is a modified ERC4626 Vault.
 // Instead of ERC20 deposits, it takes ERC1155 NFTs (Gobblers),
 // and rewards depositors with shares in proportion to the multiplier of their deposited Gobbler.
-contract GoblerPen is ERC20 {
+contract GobblerPen is ERC20, ERC1155Holder {
     using FixedPointMathLib for uint256;
 
     /*//////////////////////////////////////////////////////////////
@@ -149,4 +150,6 @@ contract GoblerPen is ERC20 {
     function previewRedeem(uint256 shares) public view virtual returns (uint256) {
         return convertToAssets(shares);
     }
+
+    // TODO add on1155Received callback to
 }
