@@ -15,27 +15,32 @@ contract GooFarmTest is Test {
     MockGoo goo;
 
     function setUp() public {
-        vm.startPrank(ALICE);
         goo = new MockGoo();
-        vm.stopPrank();
         gooFarm = new GooFarm(goo);
+
+        deal(address(goo), ALICE, 100e18);
+        deal(address(goo), BOB, 100e18);
     }
 
     function testFunc1() public {
-        logBalances(ALICE);
+        logBalances(ALICE, "Alice");
+        logBalances(BOB, "Bob");
 
         vm.startPrank(ALICE);
         goo.approve(address(gooFarm), type(uint256).max);
-        gooFarm.deposit(1e18, ALICE);
+        gooFarm.deposit(10e18, ALICE);
         vm.stopPrank();
 
-        logBalances(ALICE);
+        logBalances(ALICE, "Alice");
+        logBalances(BOB, "Bob");
     }
 
     // TEST UTILS
 
-    function logBalances(address user) public {
-        console.log("GOO balance", goo.balanceOf(user));
-        console.log("xGOO balance", gooFarm.balanceOf(user));
+    function logBalances(address user, string memory name) public {
+        console.log(name, ":");
+        console.log("GOO balance\t", goo.balanceOf(user));
+        console.log("xGOO balance\t", gooFarm.balanceOf(user));
+        console.log("\n");
     }
 }
