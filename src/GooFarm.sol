@@ -23,7 +23,7 @@ contract GooFarm is ERC4626, Ownable2Step {
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
-    constructor(ERC20 goo) ERC4626(goo, "Farmed Goo", "xGOO") {}
+    constructor(ERC20 goo) ERC4626(goo, "GOO Farm Shares", "xGOO") {}
 
     // TODO on deposit, include fee amount that mints protocol shares of GOO pool. 0 until fee switch.
 
