@@ -7,6 +7,14 @@ import {ERC1155Holder} from "openzeppelin/token/ERC1155/utils/ERC1155Holder.sol"
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
+// TODO Big refactor needed here
+// Deposited assets are now 721 (use custom Gobbler from ArtGobblers repo)
+// Receipt token should be 721 as well
+// Rewards tracking needs custom impl - not same as GOO - xGOO relationship
+// because multipliers dont grow in vault
+// Needs lastRewardsTime and currentRewards per gobbler deposited,
+// then underlying rewards to accrue to each gobbler on GOO deposits/withdrawals
+
 // GobblerPen is a modified ERC4626 Vault.
 // Instead of ERC20 deposits, it takes ERC1155 NFTs (Gobblers),
 // and rewards depositors with shares in proportion to the multiplier of their deposited Gobbler.
