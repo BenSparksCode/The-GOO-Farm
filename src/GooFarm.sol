@@ -16,6 +16,7 @@ contract GooFarm is ERC4626, Ownable2Step {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for ERC20;
 
+    // TODO move this to controller
     address public protocolTreasury;
     uint256 public protocolFee; // Out of 1e18
     uint256 public constant SCALE = 1e18;
