@@ -12,6 +12,20 @@ contract FarmController is Ownable2Step, IFarmController {
 
     constructor() {}
 
+    // VIEW FUNCTIONS
+
+    function calculateProtocolFee(uint256 _amount) public returns (uint256 fee, uint256 netAmount) {
+        fee = (protocolFee * _amount) / SCALE;
+        netAmount = _amount - fee;
+    }
+
+    function calculateGobblerCut(uint256 _amount) public returns (uint256 gobblerCut, uint256 netAmount) {
+        gobblerCut = (gobblersCut * _amount) / SCALE;
+        netAmount = _amount - gobblerCut;
+    }
+
+    // OWNER FUNCTIONS
+
     function setProtocolFee(uint256 newFee) public onlyOwner {
         if (newFee + gobblersCut > SCALE) revert GreaterThanScale();
 

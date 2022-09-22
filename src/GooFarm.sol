@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+import {IFarmController} from "./interfaces/IFarmController.sol";
+
 import {ERC4626} from "solmate/mixins/ERC4626.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 
@@ -16,35 +18,20 @@ contract GooFarm is ERC4626, Ownable2Step {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for ERC20;
 
-    // TODO move this to controller
-    address public protocolTreasury;
-    uint256 public protocolFee; // Out of 1e18
-    uint256 public constant SCALE = 1e18;
+    IFarmController public farmController;
+
+    uint256 public protocolBalance; // TODO remove this - fees accrued via xGOO balance in treasury
+    uint256 public gobblersBalance;
+    // Remaining GOO belongs to xGOO holders
+
+    // TODO def need this to manage protocol+Goo and then gobbler partitions accruing over time
+    uint256 public lastRebalanceTimestamp;
+    uint256 public lastRebalanceTotalGoo;
 
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
     constructor(ERC20 goo) ERC4626(goo, "GOO Farm Shares", "xGOO") {}
-
-    // TODO on deposit, include fee amount that mints protocol shares of GOO pool. 0 until fee switch.
-
-    function setProtocolFee(uint256 newFee) public onlyOwner {
-        if (newFee > SCALE) revert FeeGreaterThanScale();
-
-        uint256 oldFee = protocolFee;
-        protocolFee = newFee;
-
-        emit FeeUpdated(oldFee, newFee);
-    }
-
-    function setProtocolTreasury(address newTreasury) public onlyOwner {
-        if (newTreasury == address(0)) revert ZeroAddressTreasury();
-
-        address oldTreasury = protocolTreasury;
-        protocolTreasury = newTreasury;
-
-        emit TreasuryUpdated(oldTreasury, newTreasury);
-    }
 
     // If fee-switch enabled, only take fees on withdraw/redeem, after service has been provided
 
@@ -62,14 +49,14 @@ contract GooFarm is ERC4626, Ownable2Step {
         }
 
         // TODO skip if fee == 0
-        (uint256 fee, uint256 netShares) = _takeFee(shares);
+        (uint256 fee, uint256 netShares) = farmController.calculateProtocolFee(shares);
 
         // Calculate new assets recieved after share fee cut
         assets = previewRedeem(netShares);
 
         _burn(owner, netShares);
 
-        transferFrom(owner, protocolTreasury, fee);
+        transferFrom(owner, farmController.treasury(), fee);
 
         // TODO update to include fee
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
@@ -89,14 +76,14 @@ contract GooFarm is ERC4626, Ownable2Step {
         }
 
         // TODO skip if fee == 0
-        (uint256 fee, uint256 netShares) = _takeFee(shares);
+        (uint256 fee, uint256 netShares) = farmController.calculateProtocolFee(shares);
 
         // Check for rounding error since we round down in previewRedeem.
         require((assets = previewRedeem(netShares)) != 0, "ZERO_ASSETS");
 
         _burn(owner, netShares);
 
-        transferFrom(owner, protocolTreasury, fee);
+        transferFrom(owner, farmController.treasury(), fee);
 
         // TODO update to include fee
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
@@ -108,11 +95,5 @@ contract GooFarm is ERC4626, Ownable2Step {
     function totalAssets() public view override returns (uint256) {
         // TODO
         return 1;
-    }
-
-    // TODO Convert to mulDivUp
-    function _takeFee(uint256 _amount) internal returns (uint256 fee, uint256 netAmount) {
-        fee = (protocolFee * _amount) / SCALE;
-        netAmount = _amount - fee;
     }
 }
