@@ -2,21 +2,32 @@
 pragma solidity 0.8.15;
 
 import "forge-std/Test.sol";
+import {Utilities} from "./utils/Utilities.sol";
 
 import {GooFarm} from "../src/GooFarm.sol";
-import {MockGoo} from "./mocks/MockGoo.sol";
+import {ArtGobblers} from "./mocks/ArtGobblers.sol";
+import {Goo} from "./mocks/Goo.sol";
 
 contract GooFarmTest is Test {
+    Utilities internal utils;
+
     address constant OWNER = address(0x0123);
     address constant ALICE = address(0xaaa);
     address constant BOB = address(0xbbb);
 
     GooFarm gooFarm;
-    MockGoo goo;
+    ArtGobblers artGobblers;
+    Goo goo;
 
     function setUp() public {
-        goo = new MockGoo();
+        utils = new Utilities();
+
+        address predictedArtGobblersAddr = utils.predictContractAddress(address(this), 1);
+        goo = new Goo(predictedArtGobblersAddr);
+        artGobblers = new ArtGobblers(goo);
         gooFarm = new GooFarm(goo);
+
+        console.log(address(artGobblers), predictedArtGobblersAddr);
 
         deal(address(goo), ALICE, 100e18);
         deal(address(goo), BOB, 100e18);
