@@ -2,34 +2,49 @@
 pragma solidity 0.8.15;
 
 import "forge-std/Test.sol";
+import {Utilities} from "./utils/Utilities.sol";
 
 import {GooFarm} from "../src/GooFarm.sol";
-import {MockGoo} from "../src/mocks/MockGoo.sol";
+import {ArtGobblers} from "./mocks/ArtGobblers.sol";
+import {Goo} from "./mocks/Goo.sol";
 
 contract GooFarmTest is Test {
+    Utilities internal utils;
+
     address constant OWNER = address(0x0123);
     address constant ALICE = address(0xaaa);
     address constant BOB = address(0xbbb);
 
     GooFarm gooFarm;
-    MockGoo goo;
+    ArtGobblers artGobblers;
+    Goo goo;
 
     function setUp() public {
-        goo = new MockGoo();
+        utils = new Utilities();
+
+        address predictedArtGobblersAddr = utils.predictContractAddress(address(this), 1);
+        goo = new Goo(predictedArtGobblersAddr);
+        artGobblers = new ArtGobblers(goo);
         gooFarm = new GooFarm(goo);
 
-        deal(address(goo), ALICE, 100e18);
-        deal(address(goo), BOB, 100e18);
+        // deal(address(goo), ALICE, 100e18);
+        // deal(address(goo), BOB, 100e18);
     }
 
-    function testFunc1() public {
+    function testBasicGobblerMint() public {
+        uint256 aliceMul = 10;
+        uint256 bobMul = 20;
+        vm.startPrank(ALICE);
+        artGobblers.mintGobbler(aliceMul);
+        vm.stopPrank();
+        vm.startPrank(BOB);
+        artGobblers.mintGobbler(bobMul);
+        vm.stopPrank();
+
         logBalances(ALICE, "Alice");
         logBalances(BOB, "Bob");
 
-        vm.startPrank(ALICE);
-        goo.approve(address(gooFarm), type(uint256).max);
-        gooFarm.deposit(10e18, ALICE);
-        vm.stopPrank();
+        vm.warp(block.timestamp + 365 days);
 
         logBalances(ALICE, "Alice");
         logBalances(BOB, "Bob");
@@ -39,8 +54,9 @@ contract GooFarmTest is Test {
 
     function logBalances(address user, string memory name) public {
         console.log(name, ":");
-        console.log("GOO balance\t", goo.balanceOf(user));
-        console.log("xGOO balance\t", gooFarm.balanceOf(user));
+        console.log("GOO balance\t", artGobblers.gooBalance(user));
+        // console.log("xGOO balance\t", gooFarm.balanceOf(user));
+        console.log("Emission Mul\t", artGobblers.getUserEmissionMultiple(user));
         console.log("\n");
     }
 }
