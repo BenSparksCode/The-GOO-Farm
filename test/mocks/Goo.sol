@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 import {ERC20} from "solmate/tokens/ERC20.sol";
 
 /// token that can be burned and minted by the gobblers contract.
-contract MockGoo is ERC20("Goo", "GOO", 18) {
+contract Goo is ERC20("Goo", "GOO", 18) {
     /*//////////////////////////////////////////////////////////////
                                 ADDRESSES
     //////////////////////////////////////////////////////////////*/
