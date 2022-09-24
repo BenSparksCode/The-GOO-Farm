@@ -34,16 +34,24 @@ contract GooFarmTest is Test {
     function testBasicGobblerMint() public {
         uint256 aliceMul = 10;
         uint256 bobMul = 20;
-        vm.startPrank(ALICE);
+        vm.prank(ALICE);
         artGobblers.mintGobbler(aliceMul);
-        vm.stopPrank();
-        vm.startPrank(BOB);
+        vm.prank(BOB);
         artGobblers.mintGobbler(bobMul);
-        vm.stopPrank();
 
         logBalances(ALICE, "Alice");
         logBalances(BOB, "Bob");
 
+        // Both grow GOO over 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        logBalances(ALICE, "Alice");
+        logBalances(BOB, "Bob");
+
+        // Alice withdraws GOO to ERC20, another year passes
+        vm.startPrank(ALICE);
+        // artGobblers.removeGoo(artGobblers.gooBalance(ALICE));
+        artGobblers.removeGoo(artGobblers.gooBalance(ALICE));
         vm.warp(block.timestamp + 365 days);
 
         logBalances(ALICE, "Alice");
