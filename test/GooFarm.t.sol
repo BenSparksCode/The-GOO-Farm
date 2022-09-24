@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 import "forge-std/Test.sol";
 
 import {GooFarm} from "../src/GooFarm.sol";
-import {MockGoo} from "../src/mocks/MockGoo.sol";
+import {MockGoo} from "./mocks/MockGoo.sol";
 
 contract GooFarmTest is Test {
     address constant OWNER = address(0x0123);
