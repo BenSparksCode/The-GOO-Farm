@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
-import {ERC1155} from "solmate/tokens/ERC1155.sol";
-import {ERC1155Holder} from "openzeppelin/token/ERC1155/utils/ERC1155Holder.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+import {ERC721} from "solmate/tokens/ERC721.sol";
+import {ERC721TokenReceiver} from "solmate/tokens/ERC721.sol";
+
+import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 
 // TODO Big refactor needed here
 // Deposited assets are now 721 (use custom Gobbler from ArtGobblers repo)
@@ -15,128 +14,36 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 // Needs lastRewardsTime and currentRewards per gobbler deposited,
 // then underlying rewards to accrue to each gobbler on GOO deposits/withdrawals
 
+// TODO change this
 // GobblerPen is a modified ERC4626 Vault.
 // Instead of ERC20 deposits, it takes ERC1155 NFTs (Gobblers),
 // and rewards depositors with shares in proportion to the multiplier of their deposited Gobbler.
-contract GobblerPen is ERC20, ERC1155Holder {
-    using FixedPointMathLib for uint256;
+contract GobblerPen is ERC721 {
+    IArtGobblers public artGobblers;
+    address public gooFarm;
 
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
+    error OnlyGooFarmAllowed();
 
-    event Deposit(address indexed caller, address indexed owner, uint256 gobblerID, uint256 multiplier, uint256 shares);
-
-    event Withdraw(
-        address indexed caller,
-        address indexed receiver,
-        address indexed owner,
-        uint256 gobblerID,
-        uint256 multiplier,
-        uint256 shares
-    );
-
-    /*//////////////////////////////////////////////////////////////
-                               IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
-
-    ERC1155 public immutable GOBBLER;
-
-    uint256 public multiplierSum;
-
-    constructor(
-        ERC1155 _gobbler,
-        string memory _name,
-        string memory _symbol
-    ) ERC20(_name, _symbol, 18) {
-        GOBBLER = _gobbler;
+    constructor(IArtGobblers _artGobblers, address _gooFarm) ERC721("Gobbler Pen", "xGOBBLER") {
+        artGobblers = _artGobblers;
+        gooFarm = _gooFarm;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        DEPOSIT/WITHDRAWAL LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function deposit(uint256 gobblerID, address receiver) public returns (uint256 shares) {
-        // Check for rounding error since we round down in previewDeposit.
-
-        uint256 multiplier = getMultiplierOfGobbler(gobblerID);
-
-        require((shares = previewDeposit(multiplier)) != 0, "ZERO_SHARES");
-
-        multiplierSum += multiplier;
-
-        // TODO send to Gooptimizooor.sol instead of here
-        GOBBLER.safeTransferFrom(msg.sender, address(this), gobblerID, 1, "");
-
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, gobblerID, multiplier, shares);
+    function mintForGooFarm(address to, uint256 id) external onlyGooFarm {
+        _mint(to, id);
     }
 
-    function withdraw(
-        uint256 gobblerID,
-        address receiver,
-        address owner
-    ) public returns (uint256 shares) {
-        uint256 multiplier = getMultiplierOfGobbler(gobblerID);
-
-        shares = previewWithdraw(multiplier); // No need to check for rounding error, previewWithdraw rounds up.
-
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
-
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
-        }
-
-        multiplierSum -= multiplier;
-
-        _burn(owner, shares);
-
-        // TODO send from Gooptimizooor.sol instead of here
-        // TODO but do this by first withdrawing GOO to protocol
-        GOBBLER.safeTransferFrom(address(this), receiver, gobblerID, 1, "");
-
-        emit Withdraw(msg.sender, receiver, owner, gobblerID, multiplier, shares);
+    function burnForGooFarm(uint256 id) external onlyGooFarm {
+        _burn(id);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            ACCOUNTING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    // Returns sum of multipliers of Gobblers in the pen
-    // New shares are issued in proportion to this figure
-    function totalAssets() public view returns (uint256) {
-        return multiplierSum;
+    // Returns URI from underlying Gobblers contract
+    function tokenURI(uint256 id) public view override returns (string memory) {
+        return artGobblers.tokenURI(id);
     }
 
-    // Modified from ERC4626.
-    // assets represents new multiplier number of Gobbler deposited.
-    function convertToShares(uint256 assets) public view virtual returns (uint256) {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
-
-        return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
-    }
-
-    function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
-
-        return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
-    }
-
-    function previewDeposit(uint256 assets) public view virtual returns (uint256) {
-        return convertToShares(assets);
-    }
-
-    function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
-        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
-
-        return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
-    }
-
-    // Returns multiplier with 18 decimals
-    // TODO check Gobblers doesn't already include 18 decimals in multiplier
-    function getMultiplierOfGobbler(uint256 gobblerID) public view returns (uint256) {
-        // TODO implement once Gobbler contract is available
-        return 15e18;
+    modifier onlyGooFarm() {
+        if (msg.sender != gooFarm) revert OnlyGooFarmAllowed();
+        _;
     }
 }

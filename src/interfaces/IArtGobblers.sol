@@ -14,6 +14,8 @@ interface IArtGobblers {
 
     function getUserEmissionMultiple(address user) external view returns (uint256);
 
+    function tokenURI(uint256 gobblerId) external view returns (string memory);
+
     /*//////////////////////////////////////////////////////////////
                         STATE-MODIFYING FUNCTIONS
     //////////////////////////////////////////////////////////////*/
