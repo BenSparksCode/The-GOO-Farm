@@ -2,6 +2,7 @@
 pragma solidity 0.8.15;
 
 import {IFarmController} from "./interfaces/IFarmController.sol";
+import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 
 import {ERC4626} from "solmate/mixins/ERC4626.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
@@ -19,6 +20,7 @@ contract GooFarm is ERC4626, Ownable2Step {
     using SafeTransferLib for ERC20;
 
     IFarmController public farmController;
+    IArtGobblers public artGobblers;
 
     uint256 public protocolBalance; // TODO remove this - fees accrued via xGOO balance in treasury
     uint256 public gobblersBalance;
@@ -31,7 +33,9 @@ contract GooFarm is ERC4626, Ownable2Step {
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
-    constructor(ERC20 goo) ERC4626(goo, "GOO Farm Shares", "xGOO") {}
+    constructor(ERC20 goo, IArtGobblers _artGobblers) ERC4626(goo, "GOO Farm Shares", "xGOO") {
+        artGobblers = _artGobblers;
+    }
 
     // If fee-switch enabled, only take fees on withdraw/redeem, after service has been provided
 

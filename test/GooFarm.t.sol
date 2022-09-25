@@ -8,6 +8,8 @@ import {GooFarm} from "../src/GooFarm.sol";
 import {ArtGobblers} from "./mocks/ArtGobblers.sol";
 import {Goo} from "./mocks/Goo.sol";
 
+import {IArtGobblers} from "../src/interfaces/IArtGobblers.sol";
+
 contract GooFarmTest is Test {
     Utilities internal utils;
 
@@ -25,7 +27,7 @@ contract GooFarmTest is Test {
         address predictedArtGobblersAddr = utils.predictContractAddress(address(this), 1);
         goo = new Goo(predictedArtGobblersAddr);
         artGobblers = new ArtGobblers(goo);
-        gooFarm = new GooFarm(goo);
+        gooFarm = new GooFarm(goo, IArtGobblers(predictedArtGobblersAddr));
 
         // deal(address(goo), ALICE, 100e18);
         // deal(address(goo), BOB, 100e18);
