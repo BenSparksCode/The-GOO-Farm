@@ -6,6 +6,7 @@ import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 
 import {ERC4626} from "solmate/mixins/ERC4626.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
+import {ERC721TokenReceiver} from "solmate/tokens/ERC721.sol";
 
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
@@ -17,7 +18,7 @@ error ZeroAddressTreasury();
 
 // TODO add pause function for deposits, keep ownable
 
-contract GooFarm is ERC4626, Ownable2Step {
+contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for ERC20;
 
@@ -32,12 +33,21 @@ contract GooFarm is ERC4626, Ownable2Step {
     uint256 public lastRebalanceTimestamp;
     uint256 public lastRebalanceTotalGoo;
 
+    struct FarmData {
+        uint256 lastTotalGooBalance;
+        uint256 lastTimestamp;
+        uint256 lastGooHolderCut;
+        uint256 lastGobblerHolderCut;
+    }
+
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
     constructor(ERC20 goo, IArtGobblers _artGobblers) ERC4626(goo, "Goo Farm", "xGOO") {
         artGobblers = _artGobblers;
     }
+
+    // TODO add deposit/mint overrides with emissions goo
 
     // If fee-switch enabled, only take fees on withdraw/redeem, after service has been provided
 
@@ -132,11 +142,19 @@ contract GooFarm is ERC4626, Ownable2Step {
         uint256 gooAmount,
         bool usingERC20
     ) internal {
-        // TODO
-        // pull emissions goo or ERC20 goo
-        // if ERC20, convert into emissions form for farm
-        // mint user proportionate shares
-        // NOTE: xGOO should automate accounting for these users
+        if (usingERC20) {
+            // asset (in ERC4626 vault) is goo, set in constructor
+            asset.transferFrom(from, address(this), gooAmount);
+            artGobblers.addGoo(gooAmount);
+        } else {
+            // TODO update when ArtGobblers PR is finalized
+            artGobblers.transferGooFrom(from, address(this), gooAmount);
+        }
+    }
+
+    // TODO
+    function _updateBalances() internal {
+        uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
     }
 
     // Returns total GOO (less Gobbler and protocol fees) in the protocol
