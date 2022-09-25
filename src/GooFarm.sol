@@ -95,6 +95,48 @@ contract GooFarm is ERC4626, Ownable2Step {
         asset.safeTransfer(receiver, assets);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL ACCOUNTING
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Internal logic for depositing a gobbler NFT and
+    /// recieving an xGobbler NFT share
+    /// @param from Account to pull gobbler from.
+    /// @param gobblerID ID of gobbler to pull.
+    function _depositGobbler(address from, uint256 gobblerID) internal {
+        // TODO
+        // pull Gobbler NFT from ArtGobblers
+        artGobblers.transferFrom(from, address(this), gobblerID);
+
+        // mint receipt NFT
+        // Change NFT data in mapping
+
+        // Accounting - track in data in this contract
+        // totalMultiple = sum of all gobblers in farm
+        // xGobblers = {shares=mul, gobblerPoolAtDeposit}
+
+        // then on withdraw
+        // goo to user = (shares / totalMultiple) * (xGobblerGooNow - xGobblerGooAtDeposit)
+
+        // NOTE: will need manual rewards accounting tied to reciept nfts for these users
+    }
+
+    /// @notice Internal logic for depositing goo and recieving xGOO shares
+    /// @param from Account to pull goo from.
+    /// @param gooAmount Amount of goo to deposit.
+    /// @param usingERC20 Optional flag, if true will use ERC20 goo.
+    function _depositGoo(
+        address from,
+        uint256 gooAmount,
+        bool usingERC20
+    ) internal {
+        // TODO
+        // pull emissions goo or ERC20 goo
+        // if ERC20, convert into emissions form for farm
+        // mint user proportionate shares
+        // NOTE: xGOO should automate accounting for these users
+    }
+
     // Returns total GOO (less Gobbler and protocol fees) in the protocol
     function totalAssets() public view override returns (uint256) {
         // TODO

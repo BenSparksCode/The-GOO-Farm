@@ -62,7 +62,7 @@ contract GooFarmTest is Test {
 
     // TEST UTILS
 
-    function logBalances(address user, string memory name) public {
+    function logBalances(address user, string memory name) public view {
         console.log(name, ":");
         console.log("GOO balance\t", artGobblers.gooBalance(user));
         // console.log("xGOO balance\t", gooFarm.balanceOf(user));
