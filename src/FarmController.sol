@@ -19,6 +19,8 @@ contract FarmController is Ownable2Step, IFarmController {
         netAmount = _amount - fee;
     }
 
+    // Gobbler cut taken first in updateBalances
+    // Protocol fee taken in xGOO later on withdraw/redeem
     function calculateGobblerCut(uint256 _amount) public returns (uint256 gobblerCut, uint256 netAmount) {
         gobblerCut = (gobblersCut * _amount) / SCALE;
         netAmount = _amount - gobblerCut;

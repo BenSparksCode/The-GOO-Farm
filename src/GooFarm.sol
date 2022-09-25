@@ -36,15 +36,18 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     struct FarmData {
         uint256 lastTotalGooBalance;
         uint256 lastTimestamp;
-        uint256 lastGooHolderCut;
-        uint256 lastGobblerHolderCut;
+        uint256 totalGobblersBalance;
     }
+
+    FarmData public farmData;
 
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
     constructor(ERC20 goo, IArtGobblers _artGobblers) ERC4626(goo, "Goo Farm", "xGOO") {
         artGobblers = _artGobblers;
+
+        farmData = FarmData(0, block.timestamp, 0, 0);
     }
 
     // TODO add deposit/mint overrides with emissions goo
@@ -152,14 +155,20 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         }
     }
 
-    // TODO
+    // This balance update should be called before any goo deposits of withdraws
     function _updateBalances() internal {
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
+        uint256 totalBalanceDiff = currentTotalGoo - farmData.lastTotalGooBalance;
+
+        uint256 gobblerCut = calculateGobblerCut(totalBalanceDiff);
+
+        farmData.lastTotalGooBalance += currentTotalGoo;
+        farmData.totalGobblersBalance += gobblerCut;
+        farmData.lastTimestamp = block.timestamp;
     }
 
-    // Returns total GOO (less Gobbler and protocol fees) in the protocol
+    // Returns total goo attributed to xGOO holders
     function totalAssets() public view override returns (uint256) {
-        // TODO
-        return 1;
+        return farmData.lastTotalGooBalance - farmData.totalGobblersBalance;
     }
 }
