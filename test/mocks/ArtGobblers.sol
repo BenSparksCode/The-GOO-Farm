@@ -26,7 +26,11 @@ contract ArtGobblers is GobblersERC721 {
     /// @dev Will be 0 if no non legendary gobblers have been minted yet.
     uint128 public currentNonLegendaryId;
 
+    mapping(address => mapping(address => uint256)) public gooAllowance;
+
     event GooBalanceUpdated(address indexed user, uint256 newGooBalance);
+
+    event GooTransfer(address indexed from, address indexed to, uint256 gooAmount);
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -106,6 +110,75 @@ contract ArtGobblers is GobblersERC721 {
 
         // Mint the corresponding amount of ERC20 goo.
         goo.mintForGobblers(msg.sender, gooAmount);
+    }
+
+    /// @notice Approve a spender account to transfer internal goo on user's behalf.
+    /// @param spender The spender account being approved.
+    /// @param amount The amount of goo to approve spender for.
+    function approveGoo(address spender, uint256 amount) public virtual returns (bool) {
+        gooAllowance[msg.sender][spender] = amount;
+
+        emit Approval(msg.sender, spender, amount);
+
+        return true;
+    }
+
+    /// @notice Transfer goo directly from your emission balance,
+    /// to a recipient's emission balance.
+    /// @param to The goo recipient's address.
+    /// @param gooAmount The amount of goo to transfer.
+    function transferGoo(address to, uint256 gooAmount) external returns (bool) {
+        // Will revert due to underflow if we're decreasing by more than the user's current balance.
+        uint256 fromUpdatedBalance = gooBalance(msg.sender) - gooAmount;
+        getUserData[msg.sender].lastBalance = uint128(fromUpdatedBalance);
+        getUserData[msg.sender].lastTimestamp = uint64(block.timestamp);
+
+        // Don't need to do checked addition in the increase case.
+        uint256 toUpdatedBalance;
+        unchecked {
+            toUpdatedBalance = gooBalance(to) + gooAmount;
+            getUserData[to].lastBalance = uint128(toUpdatedBalance);
+            getUserData[to].lastTimestamp = uint64(block.timestamp);
+        }
+
+        emit GooBalanceUpdated(msg.sender, fromUpdatedBalance);
+        emit GooBalanceUpdated(to, toUpdatedBalance);
+        emit GooTransfer(msg.sender, to, gooAmount);
+
+        return true;
+    }
+
+    /// @notice Transfer goo directly from a user's emission balance,
+    /// to a recipient's emission balance.
+    /// @param from The goo sender's address.
+    /// @param to The goo recipient's address.
+    /// @param gooAmount The amount of goo to transfer.
+    function transferGooFrom(
+        address from,
+        address to,
+        uint256 gooAmount
+    ) external returns (bool) {
+        uint256 allowed = (from == msg.sender) ? type(uint256).max : gooAllowance[from][msg.sender];
+        if (allowed != type(uint256).max) gooAllowance[from][msg.sender] = allowed - gooAmount;
+
+        // Will revert due to underflow if we're decreasing by more than the user's current balance.
+        uint256 fromUpdatedBalance = gooBalance(from) - gooAmount;
+        getUserData[from].lastBalance = uint128(fromUpdatedBalance);
+        getUserData[from].lastTimestamp = uint64(block.timestamp);
+
+        // Don't need to do checked addition in the increase case.
+        uint256 toUpdatedBalance;
+        unchecked {
+            toUpdatedBalance = gooBalance(to) + gooAmount;
+            getUserData[to].lastBalance = uint128(toUpdatedBalance);
+            getUserData[to].lastTimestamp = uint64(block.timestamp);
+        }
+
+        emit GooBalanceUpdated(from, fromUpdatedBalance);
+        emit GooBalanceUpdated(to, toUpdatedBalance);
+        emit GooTransfer(from, to, gooAmount);
+
+        return true;
     }
 
     /// @dev An enum for representing whether to

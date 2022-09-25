@@ -20,6 +20,18 @@ interface IArtGobblers {
                         STATE-MODIFYING FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    function addGoo(uint256 gooAmount) external;
+
+    function removeGoo(uint256 gooAmount) external;
+
+    function transferGoo(address to, uint256 gooAmount) external returns (bool);
+
+    function transferGooFrom(
+        address from,
+        address to,
+        uint256 gooAmount
+    ) external returns (bool);
+
     // To transfer a Gobbler
     function transferFrom(
         address from,
