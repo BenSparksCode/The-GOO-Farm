@@ -2,7 +2,6 @@
 pragma solidity 0.8.15;
 
 import {ERC721} from "solmate/tokens/ERC721.sol";
-import {ERC721TokenReceiver} from "solmate/tokens/ERC721.sol";
 
 import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 
@@ -43,7 +42,9 @@ contract GobblerPen is ERC721 {
     }
 
     modifier onlyGooFarm() {
-        if (msg.sender != gooFarm) revert OnlyGooFarmAllowed();
+        if (msg.sender != gooFarm) {
+            revert OnlyGooFarmAllowed();
+        }
         _;
     }
 }

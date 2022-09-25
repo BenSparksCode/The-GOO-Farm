@@ -34,7 +34,9 @@ contract Goo is ERC20("Goo", "GOO", 18) {
 
     /// @notice Requires caller address to match user address.
     modifier only(address user) {
-        if (msg.sender != user) revert Unauthorized();
+        if (msg.sender != user) {
+            revert Unauthorized();
+        }
 
         _;
     }
