@@ -33,9 +33,10 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     uint256 public lastRebalanceTimestamp;
     uint256 public lastRebalanceTotalGoo;
 
+    // TODO struct packing - reads and writes for all slots on updateBalances()
     struct FarmData {
-        uint256 lastTotalGooBalance;
         uint256 lastTimestamp;
+        uint256 lastTotalGooBalance;
         uint256 totalGobblersBalance;
     }
 
@@ -47,7 +48,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     constructor(ERC20 goo, IArtGobblers _artGobblers) ERC4626(goo, "Goo Farm", "xGOO") {
         artGobblers = _artGobblers;
 
-        farmData = FarmData(0, block.timestamp, 0, 0);
+        farmData = FarmData(0, block.timestamp, 0);
     }
 
     // TODO add deposit/mint overrides with emissions goo
@@ -160,7 +161,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
         uint256 totalBalanceDiff = currentTotalGoo - farmData.lastTotalGooBalance;
 
-        uint256 gobblerCut = calculateGobblerCut(totalBalanceDiff);
+        uint256 gobblerCut = farmController.calculateGobblerCut(totalBalanceDiff);
 
         farmData.lastTotalGooBalance += currentTotalGoo;
         farmData.totalGobblersBalance += gobblerCut;

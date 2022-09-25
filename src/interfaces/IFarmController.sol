@@ -27,5 +27,5 @@ interface IFarmController {
 
     function calculateProtocolFee(uint256 _amount) external returns (uint256 fee, uint256 netAmount);
 
-    function calculateGobblerCut(uint256 _amount) external returns (uint256 gobblerCut, uint256 netAmount);
+    function calculateGobblerCut(uint256 _amount) external returns (uint256 gobblerCut);
 }
