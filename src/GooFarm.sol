@@ -140,6 +140,25 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         address to,
         uint256 gobblerID
     ) internal {
+        // pull Gobbler NFT from ArtGobblers
+        artGobblers.transferFrom(from, address(this), gobblerID);
+
+        if (to == address(0)) to = from;
+        // Send receipt token to specified to address
+        gobblerPen.mintForGooFarm(to, gobblerID);
+
+        // Update farm and gobbler data
+        _updateBalances();
+        gobblerData[gobblerID].lastTimestamp = block.timestamp;
+        gobblerData[gobblerID].totalGobblersBalanceAtDeposit = farmData.totalGobblersBalance;
+    }
+
+    /// @notice Internal logic for withdrawing a gobbler NFT,
+    /// burning the associated xGobbler NFT share,
+    /// and receiving any accrued goo rewards.
+    /// @param to Account to send gobbler and goo to.
+    /// @param gobblerID ID of gobbler to withdraw.
+    function _withdrawGobbler(address to, uint256 gobblerID) internal {
         uint256 newMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
         // pull Gobbler NFT from ArtGobblers
         artGobblers.transferFrom(from, address(this), gobblerID);
