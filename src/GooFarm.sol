@@ -3,6 +3,7 @@ pragma solidity 0.8.15;
 
 import {IFarmController} from "./interfaces/IFarmController.sol";
 import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
+import {IGobblerPen} from "./interfaces/IGobblerPen.sol";
 
 import {ERC4626} from "solmate/mixins/ERC4626.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
@@ -24,6 +25,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
     IFarmController public farmController;
     IArtGobblers public artGobblers;
+    IGobblerPen public gobblerPen;
 
     uint256 public protocolBalance; // TODO remove this - fees accrued via xGOO balance in treasury
     uint256 public gobblersBalance;
@@ -40,13 +42,26 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         uint256 totalGobblersBalance;
     }
 
+    struct GobblerDepositData {
+        uint256 lastTimestamp;
+        uint256 totalGobblersBalanceAtDeposit;
+    }
+
     FarmData public farmData;
+    mapping(uint256 => GobblerDepositData) public gobblerData; // nftID -> data
 
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
-    constructor(ERC20 goo, IArtGobblers _artGobblers) ERC4626(goo, "Goo Farm", "xGOO") {
+    constructor(
+        ERC20 goo,
+        IFarmController _farmController,
+        IArtGobblers _artGobblers,
+        IGobblerPen _gobblerPen
+    ) ERC4626(goo, "Goo Farm", "xGOO") {
+        farmController = _farmController;
         artGobblers = _artGobblers;
+        gobblerPen = _gobblerPen;
 
         farmData = FarmData(0, block.timestamp, 0);
     }

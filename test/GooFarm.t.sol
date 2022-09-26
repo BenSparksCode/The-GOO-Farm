@@ -4,11 +4,15 @@ pragma solidity 0.8.15;
 import "forge-std/Test.sol";
 import {Utilities} from "./utils/Utilities.sol";
 
-import {GooFarm} from "../src/GooFarm.sol";
-import {ArtGobblers} from "./mocks/ArtGobblers.sol";
 import {Goo} from "./mocks/Goo.sol";
+import {ArtGobblers} from "./mocks/ArtGobblers.sol";
+import {GooFarm} from "../src/GooFarm.sol";
+import {GobblerPen} from "../src/GobblerPen.sol";
+import {FarmController} from "../src/FarmController.sol";
 
+import {IFarmController} from "../src/interfaces/IFarmController.sol";
 import {IArtGobblers} from "../src/interfaces/IArtGobblers.sol";
+import {IGobblerPen} from "../src/interfaces/IGobblerPen.sol";
 
 contract GooFarmTest is Test {
     Utilities internal utils;
@@ -17,17 +21,31 @@ contract GooFarmTest is Test {
     address constant ALICE = address(0xaaa);
     address constant BOB = address(0xbbb);
 
-    GooFarm gooFarm;
-    ArtGobblers artGobblers;
     Goo goo;
+    ArtGobblers artGobblers;
+    FarmController farmController;
+    GobblerPen gobblerPen;
+    GooFarm gooFarm;
 
     function setUp() public {
         utils = new Utilities();
 
-        address predictedArtGobblersAddr = utils.predictContractAddress(address(this), 1);
-        goo = new Goo(predictedArtGobblersAddr);
+        address predictArtGobblers = utils.predictContractAddress(address(this), 1);
+        address predictFarmController = utils.predictContractAddress(address(this), 2);
+        address predictGobblerPen = utils.predictContractAddress(address(this), 3);
+        address predictGooFarm = utils.predictContractAddress(address(this), 4);
+
+        goo = new Goo(predictArtGobblers);
         artGobblers = new ArtGobblers(goo);
-        gooFarm = new GooFarm(goo, IArtGobblers(predictedArtGobblersAddr));
+        farmController = new FarmController();
+        gobblerPen = new GobblerPen(IArtGobblers(predictArtGobblers), predictGooFarm);
+
+        gooFarm = new GooFarm(
+            goo,
+            IFarmController(predictFarmController),
+            IArtGobblers(predictArtGobblers),
+            IGobblerPen(predictGobblerPen)
+        );
 
         // deal(address(goo), ALICE, 100e18);
         // deal(address(goo), BOB, 100e18);
