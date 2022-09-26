@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
-// TODO add any relevant functions/vars from GobblersERC721
+import {IERC721} from "openzeppelin/interfaces/IERC721.sol";
 
-interface IArtGobblers {
+interface IArtGobblers is IERC721 {
     /*//////////////////////////////////////////////////////////////
                                 VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -31,11 +31,4 @@ interface IArtGobblers {
         address to,
         uint256 gooAmount
     ) external returns (bool);
-
-    // To transfer a Gobbler
-    function transferFrom(
-        address from,
-        address to,
-        uint256 id
-    ) external;
 }
