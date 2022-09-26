@@ -5,14 +5,6 @@ import {ERC721} from "solmate/tokens/ERC721.sol";
 
 import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 
-// TODO Big refactor needed here
-// Deposited assets are now 721 (use custom Gobbler from ArtGobblers repo)
-// Receipt token should be 721 as well
-// Rewards tracking needs custom impl - not same as GOO - xGOO relationship
-// because multipliers dont grow in vault
-// Needs lastRewardsTime and currentRewards per gobbler deposited,
-// then underlying rewards to accrue to each gobbler on GOO deposits/withdrawals
-
 // TODO change this
 // GobblerPen is a modified ERC4626 Vault.
 // Instead of ERC20 deposits, it takes ERC1155 NFTs (Gobblers),
