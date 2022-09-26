@@ -16,6 +16,7 @@ import {Ownable2Step} from "openzeppelin/access/Ownable2Step.sol";
 // Move to errors lib
 error FeeGreaterThanScale();
 error ZeroAddressTreasury();
+error NotGobblerOwner();
 
 // TODO add pause function for deposits, keep ownable
 
@@ -30,10 +31,6 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     uint256 public protocolBalance; // TODO remove this - fees accrued via xGOO balance in treasury
     uint256 public gobblersBalance;
     // Remaining GOO belongs to xGOO holders
-
-    // TODO def need this to manage protocol+Goo and then gobbler partitions accruing over time
-    uint256 public lastRebalanceTimestamp;
-    uint256 public lastRebalanceTotalGoo;
 
     // TODO struct packing - reads and writes for all slots on updateBalances()
     struct FarmData {
@@ -159,23 +156,30 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     /// @param to Account to send gobbler and goo to.
     /// @param gobblerID ID of gobbler to withdraw.
     function _withdrawGobbler(address to, uint256 gobblerID) internal {
-        uint256 newMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
-        // pull Gobbler NFT from ArtGobblers
-        artGobblers.transferFrom(from, address(this), gobblerID);
+        if (gobblerPen.ownerOf(gobblerID) != msg.sender) revert NotGobblerOwner();
 
-        if (to == address(0)) to = from;
-        // Send receipt token to specified to address
-        gobblerPen.mintForGooFarm(to, gobblerID);
+        uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
 
-        // Update farm and gobbler data
         _updateBalances();
-        gobblerData[gobblerID].lastTimestamp = block.timestamp;
-        gobblerData[gobblerID].totalGobblersBalanceAtDeposit = farmData.totalGobblersBalance;
 
-        // then on withdraw
-        // goo to user = (shares / totalMultiple) * (xGobblerGooNow - xGobblerGooAtDeposit)
+        uint256 gobblerGooSinceDeposit = farmData.totalGobblersBalance - gobblerData[gobblerID].totalGobblersBalanceAtDeposit;
+        uint256 gooRewards = (gobblerMultiple * gobblerGooSinceDeposit) / artGobblers.getUserEmissionMultiple(address(this));
 
-        // NOTE: will need manual rewards accounting tied to reciept nfts for these users
+        // Burn receipt NFT
+        gobblerPen.burnForGooFarm(gobblerID);
+
+        // Send gobbler
+        artGobblers.transferFrom(address(this), to, gobblerID);
+
+        // Send goo
+        artGobblers.transferGoo(to, gooRewards);
+
+        // TODO dont need to delete this - will be overwritten on next deposit
+        // check before removing this line tho
+        delete gobblerData[gobblerID];
+
+        farmData.lastTotalGooBalance -= gooRewards;
+        farmData.totalGobblersBalance -= gooRewards;
     }
 
     /// @notice Internal logic for depositing goo and recieving xGOO shares
