@@ -123,6 +123,18 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         }
     }
 
+    function withdrawGobblers(uint256[] calldata gobblerIDs) public {
+        _updateBalances();
+
+        uint256 len = gobblerIDs.length;
+        if (len > 0) {
+            uint256 i;
+            for (i; i < len; ++i) {
+                _withdrawGobbler(msg.sender, gobblerIDs[i]);
+            }
+        }
+    }
+
     function withdraw(
         uint256 assets,
         address receiver,
