@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity 0.8.16;
 
 interface IFarmController {
     // EVENTS
@@ -27,5 +27,5 @@ interface IFarmController {
 
     function calculateProtocolFee(uint256 _amount) external returns (uint256 fee, uint256 netAmount);
 
-    function calculateGobblerCut(uint256 _amount) external returns (uint256 gobblerCut, uint256 netAmount);
+    function calculateGobblerCut(uint256 _amount) external returns (uint256 gobblerCut);
 }
