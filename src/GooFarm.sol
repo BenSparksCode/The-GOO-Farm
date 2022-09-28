@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.16;
 
+import "forge-std/Test.sol";
+
 import {IFarmController} from "./interfaces/IFarmController.sol";
 import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 import {IGobblerPen} from "./interfaces/IGobblerPen.sol";
@@ -285,15 +287,17 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     // This balance update should be called before any goo deposits of withdraws
     function _updateBalances() internal {
         if (lastUpdate == block.timestamp) return;
-
+        uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
+
+        if (currentTotalGoo == 0) return;
         uint256 totalBalanceDiff = currentTotalGoo - farmData.lastTotalGooBalance;
 
         uint256 gobblerCut = farmController.calculateGobblerCut(totalBalanceDiff);
 
         uint256 newGooSharesForGobblers = previewDeposit(gobblerCut);
 
-        gobblerSharesPerMultipleIndex += (newGooSharesForGobblers * 1e18) / artGobblers.getUserEmissionMultiple(address(this));
+        if (totalFarmMultiple != 0) gobblerSharesPerMultipleIndex += (newGooSharesForGobblers * 1e18) / totalFarmMultiple;
 
         farmData.lastTotalGooBalance += currentTotalGoo;
         farmData.totalGobblersBalance += gobblerCut;

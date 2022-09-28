@@ -18,8 +18,19 @@ contract GooFarmTest is Test {
     Utilities internal utils;
 
     address constant OWNER = address(0x0123);
+    // Farm users
     address constant ALICE = address(0xaaa);
     address constant BOB = address(0xbbb);
+    address constant CHAD = address(0xccc);
+
+    // Non-farm users
+    address constant N_ALICE = address(0xfaaa);
+    address constant N_BOB = address(0xfbbb);
+    address constant N_CHAD = address(0xfccc);
+
+    uint256 aliceGobbler1Mul = 69;
+    uint256 bobGobbler1Mul = 420;
+    uint256 chadGobbler1Mul = 1337;
 
     Goo goo;
     ArtGobblers artGobblers;
@@ -47,8 +58,32 @@ contract GooFarmTest is Test {
             IGobblerPen(predictGobblerPen)
         );
 
-        // deal(address(goo), ALICE, 100e18);
-        // deal(address(goo), BOB, 100e18);
+        // Mint gobblers to users
+        vm.prank(ALICE);
+        artGobblers.mintGobbler(aliceGobbler1Mul);
+        vm.prank(BOB);
+        artGobblers.mintGobbler(bobGobbler1Mul);
+        vm.prank(CHAD);
+        artGobblers.mintGobbler(chadGobbler1Mul);
+        // All users start with 1 yr of GOO
+        vm.warp(block.timestamp + 365 days);
+    }
+
+    function testGooAndGobblersDeposit() public {
+        uint256 gooBalance;
+        uint256[] memory gobblerIDs = new uint256[](1);
+        gobblerIDs[0] = 1;
+
+        // Approve goo, approve gobblers, deposit
+        vm.startPrank(ALICE);
+        artGobblers.approveGoo({spender: address(gooFarm), amount: type(uint256).max});
+        artGobblers.setApprovalForAll({operator: address(gooFarm), approved: true});
+        gooBalance = artGobblers.gooBalance(ALICE);
+        assertEq(ALICE, artGobblers.ownerOf(gobblerIDs[0]));
+        (address owner, , ) = artGobblers.getGobblerData(1);
+
+        gooFarm.depositGooOrGobblers({gooAmount: gooBalance, gobblerIDs: gobblerIDs, useERC20Goo: false});
+        vm.stopPrank();
     }
 
     function testBasicGobblerMint() public {
