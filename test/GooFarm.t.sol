@@ -15,6 +15,13 @@ import {IArtGobblers} from "../src/interfaces/IArtGobblers.sol";
 import {IGobblerPen} from "../src/interfaces/IGobblerPen.sol";
 
 contract GooFarmTest is Test {
+    struct Balances {
+        uint256 goo;
+        uint256 xGoo;
+        uint256[] Gobblers;
+        uint256[] xGobblers;
+    }
+
     Utilities internal utils;
 
     address constant OWNER = address(0x0123);
@@ -121,5 +128,27 @@ contract GooFarmTest is Test {
         // console.log("xGOO balance\t", gooFarm.balanceOf(user));
         console.log("Emission Mul\t", artGobblers.getUserEmissionMultiple(user));
         console.log("\n");
+    }
+
+    // Compare total goo between 2 users
+    // Return difference (can be negative if lower had a higher balance)
+    function compareUsersGoo(address user1, address user2)
+        internal
+        view
+        returns (
+            int256 difference,
+            uint256 user1Total,
+            uint256 user2Total
+        )
+    {
+        user1Total = getTotalGooBalance(user1);
+        user2Total = getTotalGooBalance(user2);
+        difference = int256(user1Total) - int256(user2Total);
+    }
+
+    function getTotalGooBalance(address user) internal view returns (uint256 gooBalance) {
+        uint256 normalBalance = artGobblers.gooBalance(user);
+        uint256 farmBalance = gooFarm.convertToAssets(gooFarm.balanceOf(user));
+        gooBalance = normalBalance + farmBalance;
     }
 }
