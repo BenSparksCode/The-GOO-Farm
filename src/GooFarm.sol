@@ -305,6 +305,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     }
 
     // Returns total goo attributed to xGOO holders
+    // TODO fix - doesn't work for view conversion functions
     function totalAssets() public view override returns (uint256) {
         return farmData.lastTotalGooBalance - farmData.totalGobblersBalance;
     }

@@ -66,11 +66,19 @@ contract GooFarmTest is Test {
         );
 
         // Mint gobblers to users
+        // Farm users
         vm.prank(ALICE);
         artGobblers.mintGobbler(aliceGobbler1Mul);
         vm.prank(BOB);
         artGobblers.mintGobbler(bobGobbler1Mul);
         vm.prank(CHAD);
+        artGobblers.mintGobbler(chadGobbler1Mul);
+        // Non-farm users, but start with same assets
+        vm.prank(N_ALICE);
+        artGobblers.mintGobbler(aliceGobbler1Mul);
+        vm.prank(N_BOB);
+        artGobblers.mintGobbler(bobGobbler1Mul);
+        vm.prank(N_CHAD);
         artGobblers.mintGobbler(chadGobbler1Mul);
         // All users start with 1 yr of GOO
         vm.warp(block.timestamp + 365 days);
@@ -80,6 +88,9 @@ contract GooFarmTest is Test {
         uint256 gooBalance;
         uint256[] memory gobblerIDs = new uint256[](1);
         gobblerIDs[0] = 1;
+
+        console.log("Alice: \t", getTotalGooBalance(ALICE));
+        console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
 
         // Approve goo, approve gobblers, deposit
         vm.startPrank(ALICE);
@@ -91,6 +102,12 @@ contract GooFarmTest is Test {
 
         gooFarm.depositGooOrGobblers({gooAmount: gooBalance, gobblerIDs: gobblerIDs, useERC20Goo: false});
         vm.stopPrank();
+
+        // >> 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        console.log("Alice: \t", getTotalGooBalance(ALICE));
+        console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
     }
 
     function testBasicGobblerMint() public {
@@ -149,6 +166,7 @@ contract GooFarmTest is Test {
     function getTotalGooBalance(address user) internal view returns (uint256 gooBalance) {
         uint256 normalBalance = artGobblers.gooBalance(user);
         uint256 farmBalance = gooFarm.convertToAssets(gooFarm.balanceOf(user));
+        console.log(normalBalance, farmBalance);
         gooBalance = normalBalance + farmBalance;
     }
 }
