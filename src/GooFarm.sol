@@ -34,9 +34,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     uint256 public gobblersBalance;
     // Remaining GOO belongs to xGOO holders
 
-    // TODO struct packing - reads and writes for all slots on updateBalances()
+    // TODO consolidate with internal farm data below
     struct FarmData {
-        uint256 lastUpdatedTimestamp;
         uint256 lastTotalGooBalance;
         uint256 totalGobblersBalance;
     }
@@ -73,7 +72,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         artGobblers = _artGobblers;
         gobblerPen = _gobblerPen;
 
-        farmData = FarmData(0, block.timestamp, 0);
+        farmData = FarmData(0, 0);
     }
 
     function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
