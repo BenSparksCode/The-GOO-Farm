@@ -56,7 +56,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     }
     uint256 internal lastUpdate;
     uint256 internal gobblerSharesPerMultipleIndex = 0;
-    mapping(uint256 => GobblerStaking) public gobblerStakingMap; // id to 'lastIndex'
+    mapping(uint256 => GobblerStaking) public gobblerStakingMap; // gobblerID to 'lastIndex'
     // END
 
     event FeeUpdated(uint256 oldFee, uint256 newFee);
@@ -307,6 +307,19 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     // Returns total goo attributed to xGOO holders
     // TODO fix - doesn't work for view conversion functions
     function totalAssets() public view override returns (uint256) {
+        // NOTE: Misleading function name
+        // Part of the ERC4626 vault which is only for xGOO holders
+        // This reports the total goo attributable to xGOO holders
+        // But excludes any goo attributable to xGobbler holders
+
+        // TODO update to this
+        // Eqn:
+        // (lastTotalGooBalance - totalGobblersBalance) +
+        // ((artGobblers.balanceOf(address(this)) - lastTotalGooBalance) / 2)
+
+        // TODO add last block updated check to skip reads if already updated in the call stack
+
+        // OLD:
         return farmData.lastTotalGooBalance - farmData.totalGobblersBalance;
     }
 }
