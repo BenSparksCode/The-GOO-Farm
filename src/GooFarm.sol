@@ -36,7 +36,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
     // TODO struct packing - reads and writes for all slots on updateBalances()
     struct FarmData {
-        uint256 lastTimestamp;
+        uint256 lastUpdatedTimestamp;
         uint256 lastTotalGooBalance;
         uint256 totalGobblersBalance;
     }
@@ -54,7 +54,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     struct GobblerStaking {
         uint256 lastIndex;
     }
-    uint256 internal lastUpdate;
+    uint256 internal lastUpdateTime;
+
     uint256 internal gobblerSharesPerMultipleIndex = 0;
     mapping(uint256 => GobblerStaking) public gobblerStakingMap; // gobblerID to 'lastIndex'
     // END
@@ -223,7 +224,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         gobblerStakingMap[gobblerID].lastIndex = gobblerSharesPerMultipleIndex;
 
-        // gobblerData[gobblerID].lastTimestamp = block.timestamp;
+        // gobblerData[gobblerID].lastUpdatedTimestamp = block.timestamp;
         // gobblerData[gobblerID].totalGobblersBalanceAtDeposit = farmData.totalGobblersBalance;
     }
 
@@ -286,7 +287,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
     // This balance update should be called before any goo deposits of withdraws
     function _updateBalances() internal {
-        if (lastUpdate == block.timestamp) return;
+        if (lastUpdateTime == block.timestamp) return;
         uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
 
@@ -301,25 +302,21 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         farmData.lastTotalGooBalance += currentTotalGoo;
         farmData.totalGobblersBalance += gobblerCut;
-        farmData.lastTimestamp = block.timestamp;
+        lastUpdateTime = block.timestamp;
     }
 
-    // Returns total goo attributed to xGOO holders
-    // TODO fix - doesn't work for view conversion functions
+    // NOTE: Misleading function name
+    // Part of the ERC4626 vault which is only for xGOO holders
+    // This reports the total goo attributable to xGOO holders
+    // But excludes any goo attributable to xGobbler holders
     function totalAssets() public view override returns (uint256) {
-        // NOTE: Misleading function name
-        // Part of the ERC4626 vault which is only for xGOO holders
-        // This reports the total goo attributable to xGOO holders
-        // But excludes any goo attributable to xGobbler holders
-
-        // TODO update to this
-        // Eqn:
-        // (lastTotalGooBalance - totalGobblersBalance) +
-        // ((artGobblers.balanceOf(address(this)) - lastTotalGooBalance) / 2)
-
-        // TODO add last block updated check to skip reads if already updated in the call stack
-
-        // OLD:
-        return farmData.lastTotalGooBalance - farmData.totalGobblersBalance;
+        // We can skip the external contract reads if farmData was updated in this block
+        if (lastUpdateTime == block.timestamp) {
+            return farmData.lastTotalGooBalance - farmData.totalGobblersBalance;
+        } else {
+            return
+                (farmData.lastTotalGooBalance - farmData.totalGobblersBalance) +
+                farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - farmData.lastTotalGooBalance);
+        }
     }
 }

@@ -15,13 +15,6 @@ import {IArtGobblers} from "../src/interfaces/IArtGobblers.sol";
 import {IGobblerPen} from "../src/interfaces/IGobblerPen.sol";
 
 contract GooFarmTest is Test {
-    struct Balances {
-        uint256 goo;
-        uint256 xGoo;
-        uint256[] Gobblers;
-        uint256[] xGobblers;
-    }
-
     Utilities internal utils;
 
     address constant OWNER = address(0x0123);
@@ -34,6 +27,9 @@ contract GooFarmTest is Test {
     address constant N_ALICE = address(0xfaaa);
     address constant N_BOB = address(0xfbbb);
     address constant N_CHAD = address(0xfccc);
+
+    address constant TREASURY = address(0x777);
+    uint256 constant GOBBLER_CUT = 0.5e18;
 
     uint256 aliceGobbler1Mul = 69;
     uint256 bobGobbler1Mul = 420;
@@ -55,7 +51,7 @@ contract GooFarmTest is Test {
 
         goo = new Goo(predictArtGobblers);
         artGobblers = new ArtGobblers(goo);
-        farmController = new FarmController();
+        farmController = new FarmController(GOBBLER_CUT, 0, TREASURY);
         gobblerPen = new GobblerPen(IArtGobblers(predictArtGobblers), predictGooFarm);
 
         gooFarm = new GooFarm(
@@ -166,7 +162,7 @@ contract GooFarmTest is Test {
     function getTotalGooBalance(address user) internal view returns (uint256 gooBalance) {
         uint256 normalBalance = artGobblers.gooBalance(user);
         uint256 farmBalance = gooFarm.convertToAssets(gooFarm.balanceOf(user));
-        console.log(normalBalance, farmBalance);
+        console.log("normal goo", normalBalance, "goo in farm", farmBalance);
         gooBalance = normalBalance + farmBalance;
     }
 }
