@@ -21,6 +21,7 @@ error ZeroAddressTreasury();
 error NotGobblerOwner();
 
 // TODO add pause function for deposits, keep ownable
+// TODO make sure incompatible functions from 4626 are blocked here
 
 contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     using FixedPointMathLib for uint256;
@@ -221,7 +222,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         _updateBalances();
 
-        uint256 gooToWithdraw = (gobblerMultiple * accGooPerGobblerShare) / SCALE;
+        uint256 gooToWithdraw = (gobblerMultiple * (accGooPerGobblerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) /
+            SCALE;
 
         // Update global farm variables
         lastFarmGooBalance -= gooToWithdraw;
@@ -275,6 +277,25 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         lastFarmGooBalance = currentTotalGoo;
         lastGobblersGooBalance += gobblerCut;
         lastUpdateTime = block.timestamp;
+    }
+
+    function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
+        // If gobbler not in farm, zero goo earned
+        if (artGobblers.ownerOf(gobblerID) != address(this)) return 0;
+
+        uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
+        uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+
+        if (lastUpdateTime == block.timestamp) {
+            return (gobblerMultiple * lastFarmGooBalance) / totalFarmMultiple;
+        } else {
+            uint256 newGobblerGooPerShare = (farmController.calculateGobblerCut(
+                artGobblers.gooBalance(address(this)) - lastFarmGooBalance
+            ) * SCALE) / totalFarmMultiple;
+            return
+                (gobblerMultiple *
+                    (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
+        }
     }
 
     // NOTE: Misleading function name
