@@ -26,6 +26,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for ERC20;
 
+    uint256 internal constant SCALE = 1e18;
+
     // EXTERNAL CONTRACTS
     IFarmController public farmController;
     IArtGobblers public artGobblers;
@@ -39,8 +41,9 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     // GOBBLER ACCOUNTING
     uint256 internal accGooPerGobblerShare;
     struct StakedGobbler {
-        uint256 gobblerMultiplier; // Multiplier staked/contributed (`amount` in MasterChef PoolStaker)
-        uint256 gobblerGooDebt; // Amount deducted from `accGooPerGobblerShare` (`rewardDebt` in MasterChef PoolStaker)
+        // Prev rewards not claimable relative to `accGooPerGobblerShare` (`rewardDebt` in MasterChef PoolStaker)
+        uint256 gobblerGooDebtPerShare;
+        // Note: No need to store gobblerMultiplier as it doesn't change and can be read on withdraw
     }
     mapping(uint256 => StakedGobbler) public stakedGobblers; // nftID -> StakedGobbler
 
@@ -212,10 +215,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         // Update farm and gobbler data
         _updateBalances();
 
-        gobblerStakingMap[gobblerID].lastIndex = gobblerSharesPerMultipleIndex;
-
-        // gobblerData[gobblerID].lastUpdatedTimestamp = block.timestamp;
-        // gobblerData[gobblerID].totalGobblersBalanceAtDeposit = lastGobblersGooBalance;
+        stakedGobblers[gobblerID].gobblerGooDebtPerShare = accGooPerGobblerShare;
     }
 
     /// @notice Internal logic for withdrawing a gobbler NFT,
