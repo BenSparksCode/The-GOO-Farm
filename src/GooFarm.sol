@@ -37,15 +37,14 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     uint256 public lastGobblersGooBalance; // Goo that belongs to Gobbler stakers
 
     // GOBBLER ACCOUNTING
-
-    // TODO delete - outdated method
-    struct GobblerDepositData {
-        uint256 lastTimestamp;
-        uint256 totalGobblersBalanceAtDeposit;
+    uint256 internal accGooPerGobblerShare;
+    struct StakedGobbler {
+        uint256 gobblerMultiplier; // Multiplier staked/contributed (`amount` in MasterChef PoolStaker)
+        uint256 gobblerGooDebt; // Amount deducted from `accGooPerGobblerShare` (`rewardDebt` in MasterChef PoolStaker)
     }
-    mapping(uint256 => GobblerDepositData) public gobblerData; // nftID -> data
+    mapping(uint256 => StakedGobbler) public stakedGobblers; // nftID -> StakedGobbler
 
-    // TODO TEST DATA
+    // TODO TEST DATA - REMOVE after refactor
     struct GobblerStaking {
         uint256 lastIndex;
     }
