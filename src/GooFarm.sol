@@ -47,14 +47,6 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     }
     mapping(uint256 => StakedGobbler) public stakedGobblers; // nftID -> StakedGobbler
 
-    // TODO TEST DATA - REMOVE after refactor
-    struct GobblerStaking {
-        uint256 lastIndex;
-    }
-    uint256 internal gobblerSharesPerMultipleIndex = 0;
-    mapping(uint256 => GobblerStaking) public gobblerStakingMap; // gobblerID to 'lastIndex'
-    // END OF TEST DATA
-
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
@@ -96,20 +88,13 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
     // Gives you more control than the ERC4626 functions for GOO
     // Can do goo directly in emissions mode
+    // TODO split into diff funcs - multicall can achieve this
     function depositGooOrGobblers(
         uint256 gooAmount,
         uint256[] calldata gobblerIDs,
         bool useERC20Goo
     ) public {
-        _updateBalances();
-
-        // Handle Goo deposit
-        if (gooAmount != 0) {
-            uint256 shares = previewDeposit(gooAmount);
-            _depositGoo(msg.sender, gooAmount, useERC20Goo);
-            _mint(msg.sender, shares);
-        }
-
+        // First handle Gobblers
         uint256 len = gobblerIDs.length;
         if (len > 0) {
             uint256 i;
@@ -117,11 +102,16 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
                 _depositGobbler(msg.sender, msg.sender, gobblerIDs[i]);
             }
         }
+
+        // Then handle Goo
+        if (gooAmount != 0) {
+            uint256 shares = previewDeposit(gooAmount);
+            _depositGoo(msg.sender, gooAmount, useERC20Goo);
+            _mint(msg.sender, shares);
+        }
     }
 
     function withdrawGobblers(uint256[] calldata gobblerIDs) public {
-        _updateBalances();
-
         uint256 len = gobblerIDs.length;
         if (len > 0) {
             uint256 i;
@@ -227,24 +217,16 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         if (gobblerPen.ownerOf(gobblerID) != msg.sender) revert NotGobblerOwner();
 
         uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
+        uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
 
         _updateBalances();
 
-        uint256 gooShares = ((gobblerSharesPerMultipleIndex - gobblerStakingMap[gobblerID].lastIndex) * gobblerMultiple) / 1e18;
+        uint256 gooToWithdraw = (gobblerMultiple * accGooPerGobblerShare) / SCALE;
 
-        uint256 gooRewards;
-        if (gooShares > 0) {
-            gooRewards = previewRedeem(gooShares) / 1e18;
-
-            lastFarmGooBalance -= gooRewards;
-            lastGobblersGooBalance -= gooRewards;
-        }
-
-        delete gobblerData[gobblerID];
-
-        // OLD Attempt - delete
-        // uint256 gobblerGooSinceDeposit = lastGobblersGooBalance - gobblerData[gobblerID].totalGobblersBalanceAtDeposit;
-        // uint256 gooRewards = (gobblerMultiple * gobblerGooSinceDeposit) / artGobblers.getUserEmissionMultiple(address(this));
+        // Update global farm variables
+        lastFarmGooBalance -= gooToWithdraw;
+        lastGobblersGooBalance -= gooToWithdraw;
+        delete stakedGobblers[gobblerID];
 
         // Burn receipt NFT
         gobblerPen.burnForGooFarm(gobblerID);
@@ -253,7 +235,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         artGobblers.transferFrom(address(this), to, gobblerID);
 
         // Send goo
-        artGobblers.transferGoo(to, gooRewards);
+        artGobblers.transferGoo(to, gooToWithdraw);
     }
 
     /// @notice Internal logic for depositing goo and recieving xGOO shares
@@ -275,7 +257,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         }
     }
 
-    // This balance update should be called before any goo deposits of withdraws
+    // This balance update should be called before any deposits or withdraws
     function _updateBalances() internal {
         if (lastUpdateTime == block.timestamp) return;
         uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
@@ -286,11 +268,11 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         uint256 gobblerCut = farmController.calculateGobblerCut(totalBalanceDiff);
 
-        uint256 newGooSharesForGobblers = previewDeposit(gobblerCut);
+        // Increase goo for gobbler stakers - MasterChef logic
+        // Will revert if Goo deposited with no Gobblers in farm - intended
+        accGooPerGobblerShare = accGooPerGobblerShare + ((gobblerCut * SCALE) / totalFarmMultiple);
 
-        if (totalFarmMultiple != 0) gobblerSharesPerMultipleIndex += (newGooSharesForGobblers * 1e18) / totalFarmMultiple;
-
-        lastFarmGooBalance += currentTotalGoo;
+        lastFarmGooBalance = currentTotalGoo;
         lastGobblersGooBalance += gobblerCut;
         lastUpdateTime = block.timestamp;
     }
