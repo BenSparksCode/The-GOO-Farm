@@ -102,7 +102,7 @@ contract GooFarmTest is Test {
         // >> 1 year
         vm.warp(block.timestamp + 365 days);
 
-        console.log("Alice: \t", getTotalGooBalance(ALICE));
+        console.log("Alice: \t", getTotalGooBalance(ALICE) + getGobblersGooInFarm(gobblerIDs));
         console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
     }
 
@@ -164,5 +164,11 @@ contract GooFarmTest is Test {
         uint256 farmBalance = gooFarm.convertToAssets(gooFarm.balanceOf(user));
         console.log("normal goo", normalBalance, "goo in farm", farmBalance);
         gooBalance = normalBalance + farmBalance;
+    }
+
+    function getGobblersGooInFarm(uint256[] memory gobblerIDs) internal view returns (uint256 gooBalance) {
+        for (uint256 i = 0; i < gobblerIDs.length; i++) {
+            gooBalance += gooFarm.gooEarnedByGobbler(gobblerIDs[i]);
+        }
     }
 }
