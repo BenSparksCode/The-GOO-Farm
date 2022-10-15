@@ -152,20 +152,26 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         _updateBalances();
 
-        // TODO skip if fee == 0
-        (uint256 fee, uint256 netShares) = farmController.calculateProtocolFee(shares);
+        uint256 fee;
+        uint256 netShares;
+
+        if (farmController.protocolFee() > 0) {
+            (fee, netShares) = farmController.calculateProtocolFee(shares);
+        } else {
+            (fee, netShares) = (0, shares);
+        }
 
         // Calculate new assets recieved after share fee cut
         assets = previewRedeem(netShares);
 
         _burn(owner, netShares);
 
-        transferFrom(owner, farmController.treasury(), fee);
+        if (fee > 0) transferFrom(owner, farmController.treasury(), fee);
 
         // TODO update to include fee
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
-        asset.safeTransfer(receiver, assets);
+        _withdrawGoo(receiver, assets, false); // TODO consider erc20 flag
     }
 
     // TODO support ERC20 goo with optional flag
@@ -270,7 +276,6 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         bool usingERC20
     ) internal {
         if (usingERC20) {
-            // asset (in ERC4626 vault) is goo, set in constructor
             asset.transferFrom(from, address(this), gooAmount);
             artGobblers.addGoo(gooAmount);
         } else {
@@ -279,7 +284,19 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         }
     }
 
-    function _withdrawGoo() internal {}
+    function _withdrawGoo(
+        address to,
+        uint256 gooAmount,
+        bool usingERC20
+    ) internal {
+        if (usingERC20) {
+            artGobblers.removeGoo(gooAmount);
+            asset.transfer(to, gooAmount);
+        } else {
+            // TODO update when ArtGobblers PR is finalized
+            artGobblers.transferGoo(to, gooAmount);
+        }
+    }
 
     // This balance update should be called before any deposits or withdraws
     function _updateBalances() internal {
