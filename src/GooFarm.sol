@@ -281,6 +281,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
             // TODO update when ArtGobblers PR is finalized
             artGobblers.transferGooFrom(from, address(this), gooAmount);
         }
+
+        lastFarmGooBalance = artGobblers.gooBalance(address(this));
     }
 
     function _withdrawGoo(
@@ -295,6 +297,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
             // TODO update when ArtGobblers PR is finalized
             artGobblers.transferGoo(to, gooAmount);
         }
+
+        lastFarmGooBalance = artGobblers.gooBalance(address(this));
     }
 
     // This balance update should be called before any deposits or withdraws
