@@ -112,9 +112,6 @@ contract GooFarmTest is Test {
         uint256[] memory aGobblers = new uint256[](1);
         aGobblers[0] = 1;
 
-        console.log("Alice: \t", getTotalGooBalance(ALICE));
-        console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
-
         assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
         assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
 
@@ -123,8 +120,10 @@ contract GooFarmTest is Test {
         // >> 1 year
         vm.warp(block.timestamp + 365 days);
 
-        console.log("Alice: \t", getTotalGooBalance(ALICE) + getGobblersGooInFarm(aGobblers));
-        console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
+        withdrawEverything(ALICE, aGobblers);
+
+        assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
+        assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -158,7 +157,6 @@ contract GooFarmTest is Test {
     function getTotalGooBalance(address user) internal view returns (uint256 gooBalance) {
         uint256 normalBalance = artGobblers.gooBalance(user);
         uint256 farmBalance = gooFarm.convertToAssets(gooFarm.balanceOf(user));
-        console.log("normal goo", normalBalance, "goo in farm", farmBalance);
         gooBalance = normalBalance + farmBalance;
     }
 
@@ -184,9 +182,7 @@ contract GooFarmTest is Test {
     function withdrawEverything(address user, uint256[] memory gobblerIDs) internal {
         vm.startPrank(user);
         gooFarm.withdrawGobblers({to: user, gobblerIDs: gobblerIDs});
-        // uint256 erc20GooBal = goo.balanceOf(user);
-        // if (erc20GooBal > 0) artGobblers.addGoo(erc20GooBal);
-        // gooFarm.deposit(artGobblers.gooBalance(user), user, false);
+        gooFarm.withdraw(gooFarm.maxWithdraw(user), user, user);
         vm.stopPrank();
     }
 }
