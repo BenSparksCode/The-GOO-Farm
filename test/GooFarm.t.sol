@@ -126,6 +126,141 @@ contract GooFarmTest is Test {
         assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
     }
 
+    function testThreeStakersParityNoGooInjection() public {
+        uint256[] memory aGobblers = new uint256[](1);
+        aGobblers[0] = 1;
+        uint256[] memory bGobblers = new uint256[](1);
+        bGobblers[0] = 2;
+        uint256[] memory cGobblers = new uint256[](1);
+        cGobblers[0] = 3;
+
+        assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
+        assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
+        assertEq(artGobblers.gooBalance(BOB), artGobblers.gooBalance(N_BOB));
+        assertEq(artGobblers.getUserEmissionMultiple(BOB), artGobblers.getUserEmissionMultiple(N_BOB));
+        assertEq(artGobblers.gooBalance(CHAD), artGobblers.gooBalance(N_CHAD));
+        assertEq(artGobblers.getUserEmissionMultiple(CHAD), artGobblers.getUserEmissionMultiple(N_CHAD));
+
+        console.log("\nStarting Goo balances:");
+        console.log(artGobblers.gooBalance(ALICE));
+        console.log(artGobblers.gooBalance(BOB));
+        console.log(artGobblers.gooBalance(CHAD));
+
+        depositEverything(ALICE, aGobblers);
+        depositEverything(BOB, bGobblers);
+        depositEverything(CHAD, cGobblers);
+
+        // >> 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        console.log("\nGobbler Goo balances:");
+        console.log(gooFarm.gooEarnedByGobbler(1));
+        console.log(gooFarm.gooEarnedByGobbler(2));
+        console.log(gooFarm.gooEarnedByGobbler(3));
+
+        console.log("\nxGoo balances:");
+        console.log(gooFarm.balanceOf(ALICE));
+        console.log(gooFarm.balanceOf(BOB));
+        console.log(gooFarm.balanceOf(CHAD));
+
+        console.log("\nwithdraws:");
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("ALICE\t", getGobblersGooInFarm(aGobblers) + getTotalGooBalance(ALICE));
+        withdrawEverything(ALICE, aGobblers);
+
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("BOB\t", getGobblersGooInFarm(bGobblers) + getTotalGooBalance(BOB));
+        withdrawEverything(BOB, bGobblers);
+
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("CHAD\t", getGobblersGooInFarm(cGobblers) + getTotalGooBalance(CHAD));
+        withdrawEverything(CHAD, cGobblers);
+
+        console.log("ALICE\t", getGobblersGooInFarm(aGobblers) + getTotalGooBalance(ALICE));
+        console.log("N_ALI\t", getTotalGooBalance(N_ALICE));
+        console.log("BOB\t", getGobblersGooInFarm(bGobblers) + getTotalGooBalance(BOB));
+        console.log("N_BOB\t", getTotalGooBalance(N_BOB));
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("CHAD\t", getGobblersGooInFarm(cGobblers) + getTotalGooBalance(CHAD));
+        console.log("N_CH\t", getTotalGooBalance(N_CHAD));
+
+        assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
+        assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
+        assertEq(artGobblers.gooBalance(BOB), artGobblers.gooBalance(N_BOB));
+        assertEq(artGobblers.getUserEmissionMultiple(BOB), artGobblers.getUserEmissionMultiple(N_BOB));
+        assertEq(artGobblers.gooBalance(CHAD), artGobblers.gooBalance(N_CHAD));
+        assertEq(artGobblers.getUserEmissionMultiple(CHAD), artGobblers.getUserEmissionMultiple(N_CHAD));
+    }
+
+    function testThreeStakersOutperformWithGooInjection() public {
+        uint256[] memory aGobblers = new uint256[](1);
+        aGobblers[0] = 1;
+        uint256[] memory bGobblers = new uint256[](1);
+        bGobblers[0] = 2;
+        uint256[] memory cGobblers = new uint256[](1);
+        cGobblers[0] = 3;
+
+        assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
+        assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
+        assertEq(artGobblers.gooBalance(BOB), artGobblers.gooBalance(N_BOB));
+        assertEq(artGobblers.getUserEmissionMultiple(BOB), artGobblers.getUserEmissionMultiple(N_BOB));
+        assertEq(artGobblers.gooBalance(CHAD), artGobblers.gooBalance(N_CHAD));
+        assertEq(artGobblers.getUserEmissionMultiple(CHAD), artGobblers.getUserEmissionMultiple(N_CHAD));
+
+        console.log("\nStarting Goo balances:");
+        console.log(artGobblers.gooBalance(ALICE));
+        console.log(artGobblers.gooBalance(BOB));
+        console.log(artGobblers.gooBalance(CHAD));
+
+        increaseAllUsersGooEqually(500000000000e18);
+
+        depositEverything(ALICE, aGobblers);
+        depositEverything(BOB, bGobblers);
+        depositEverything(CHAD, cGobblers);
+
+        // >> 1 year
+        vm.warp(block.timestamp + (1 * 365 days));
+
+        console.log("\nGobbler Goo balances:");
+        console.log(gooFarm.gooEarnedByGobbler(1));
+        console.log(gooFarm.gooEarnedByGobbler(2));
+        console.log(gooFarm.gooEarnedByGobbler(3));
+
+        console.log("\nxGoo balances:");
+        console.log(gooFarm.balanceOf(ALICE));
+        console.log(gooFarm.balanceOf(BOB));
+        console.log(gooFarm.balanceOf(CHAD));
+
+        console.log("\nwithdraws:");
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("ALICE\t", getGobblersGooInFarm(aGobblers) + getTotalGooBalance(ALICE));
+        withdrawEverything(ALICE, aGobblers);
+
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("BOB\t", getGobblersGooInFarm(bGobblers) + getTotalGooBalance(BOB));
+        withdrawEverything(BOB, bGobblers);
+
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+        console.log("CHAD\t", getGobblersGooInFarm(cGobblers) + getTotalGooBalance(CHAD));
+        withdrawEverything(CHAD, cGobblers);
+
+        console.log("\nfinal balances:");
+        console.log("ALICE\t", getGobblersGooInFarm(aGobblers) + getTotalGooBalance(ALICE));
+        console.log("N_ALI\t", getTotalGooBalance(N_ALICE));
+        console.log("BOB\t", getGobblersGooInFarm(bGobblers) + getTotalGooBalance(BOB));
+        console.log("N_BOB\t", getTotalGooBalance(N_BOB));
+        console.log("CHAD\t", getGobblersGooInFarm(cGobblers) + getTotalGooBalance(CHAD));
+        console.log("N_CH\t", getTotalGooBalance(N_CHAD));
+        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
+
+        assertGt(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
+        assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
+        assertGt(artGobblers.gooBalance(BOB), artGobblers.gooBalance(N_BOB));
+        assertEq(artGobblers.getUserEmissionMultiple(BOB), artGobblers.getUserEmissionMultiple(N_BOB));
+        assertGt(artGobblers.gooBalance(CHAD), artGobblers.gooBalance(N_CHAD));
+        assertEq(artGobblers.getUserEmissionMultiple(CHAD), artGobblers.getUserEmissionMultiple(N_CHAD));
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 TEST UTILS
     //////////////////////////////////////////////////////////////*/
@@ -184,5 +319,22 @@ contract GooFarmTest is Test {
         gooFarm.withdrawGobblers({to: user, gobblerIDs: gobblerIDs});
         gooFarm.withdraw(gooFarm.maxWithdraw(user), user, user);
         vm.stopPrank();
+    }
+
+    function increaseAllUsersGooEqually(uint256 amount) internal {
+        address[] memory allUsers = new address[](6);
+        allUsers[0] = ALICE;
+        allUsers[1] = BOB;
+        allUsers[2] = CHAD;
+        allUsers[3] = N_ALICE;
+        allUsers[4] = N_BOB;
+        allUsers[5] = N_CHAD;
+
+        for (uint256 i; i < allUsers.length; ++i) {
+            deal(address(goo), allUsers[i], amount);
+            vm.startPrank(allUsers[i]);
+            artGobblers.addGoo(goo.balanceOf(allUsers[i]));
+            vm.stopPrank();
+        }
     }
 }
