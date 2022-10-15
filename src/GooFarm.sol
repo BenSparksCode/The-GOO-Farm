@@ -242,7 +242,6 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         if (gobblerPen.ownerOf(gobblerID) != msg.sender) revert NotGobblerOwner();
 
         uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
-        uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
 
         _updateBalances();
 
