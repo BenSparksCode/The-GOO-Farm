@@ -32,7 +32,7 @@ contract GooFarmTest is Test {
 
     uint256 aliceGobbler1Mul = 69;
     uint256 bobGobbler1Mul = 420;
-    uint256 chadGobbler1Mul = 1337;
+    uint256 chadGobbler1Mul = 750;
 
     Goo goo;
     ArtGobblers artGobblers;
@@ -151,7 +151,7 @@ contract GooFarmTest is Test {
         depositEverything(CHAD, cGobblers);
 
         // >> 1 year
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(block.timestamp + (10 * 365 days));
 
         console.log("\nGobbler Goo balances:");
         console.log(gooFarm.gooEarnedByGobbler(1));
@@ -176,11 +176,11 @@ contract GooFarmTest is Test {
         console.log("CHAD\t", getGobblersGooInFarm(cGobblers) + getTotalGooBalance(CHAD));
         withdrawEverything(CHAD, cGobblers);
 
+        console.log("\nfinal balances:");
         console.log("ALICE\t", getGobblersGooInFarm(aGobblers) + getTotalGooBalance(ALICE));
         console.log("N_ALI\t", getTotalGooBalance(N_ALICE));
         console.log("BOB\t", getGobblersGooInFarm(bGobblers) + getTotalGooBalance(BOB));
         console.log("N_BOB\t", getTotalGooBalance(N_BOB));
-        console.log("Farm\t", artGobblers.gooBalance(address(gooFarm)));
         console.log("CHAD\t", getGobblersGooInFarm(cGobblers) + getTotalGooBalance(CHAD));
         console.log("N_CH\t", getTotalGooBalance(N_CHAD));
 
@@ -200,6 +200,8 @@ contract GooFarmTest is Test {
         uint256[] memory cGobblers = new uint256[](1);
         cGobblers[0] = 3;
 
+        uint256 airdropAmount = 60000e18;
+
         assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
         assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
         assertEq(artGobblers.gooBalance(BOB), artGobblers.gooBalance(N_BOB));
@@ -212,14 +214,15 @@ contract GooFarmTest is Test {
         console.log(artGobblers.gooBalance(BOB));
         console.log(artGobblers.gooBalance(CHAD));
 
-        increaseAllUsersGooEqually(500000000000e18);
+        increaseAllUsersGooEqually(airdropAmount);
+        console.log(airdropAmount);
 
         depositEverything(ALICE, aGobblers);
         depositEverything(BOB, bGobblers);
         depositEverything(CHAD, cGobblers);
 
         // >> 1 year
-        vm.warp(block.timestamp + (1 * 365 days));
+        vm.warp(block.timestamp + (10 * 365 days));
 
         console.log("\nGobbler Goo balances:");
         console.log(gooFarm.gooEarnedByGobbler(1));
