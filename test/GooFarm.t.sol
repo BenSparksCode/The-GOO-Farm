@@ -22,7 +22,6 @@ contract GooFarmTest is Test {
     address constant ALICE = address(0xaaa);
     address constant BOB = address(0xbbb);
     address constant CHAD = address(0xccc);
-
     // Non-farm users
     address constant N_ALICE = address(0xfaaa);
     address constant N_BOB = address(0xfbbb);
@@ -80,60 +79,57 @@ contract GooFarmTest is Test {
         vm.warp(block.timestamp + 365 days);
     }
 
-    function testGooAndGobblersDeposit() public {
-        uint256 gooBalance;
-        uint256[] memory gobblerIDs = new uint256[](1);
-        gobblerIDs[0] = 1;
+    /*//////////////////////////////////////////////////////////////
+                                NEGATIVES
+    //////////////////////////////////////////////////////////////*/
+
+    // TODO test any standard ERC4626 behaviour should be disabled if needed
+
+    /*//////////////////////////////////////////////////////////////
+                                POSITIVES
+    //////////////////////////////////////////////////////////////*/
+
+    function testGobblersDepositedAsExpected() public {
+        uint256 gobblerId = 1;
+        uint256[] memory aGobblers = new uint256[](1);
+        aGobblers[0] = gobblerId;
+
+        assertEq(artGobblers.ownerOf(gobblerId), ALICE);
+        vm.expectRevert(bytes("NOT_MINTED"));
+        assertEq(gobblerPen.ownerOf(gobblerId), address(0));
+
+        depositEverything(ALICE, aGobblers);
+
+        assertEq(gobblerPen.ownerOf(gobblerId), ALICE);
+        assertEq(artGobblers.ownerOf(gobblerId), address(gooFarm));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                SCENARIOS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFarmNonfarmProductionParity() public {
+        uint256[] memory aGobblers = new uint256[](1);
+        aGobblers[0] = 1;
 
         console.log("Alice: \t", getTotalGooBalance(ALICE));
         console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
 
-        // Approve goo, approve gobblers, deposit
-        vm.startPrank(ALICE);
-        artGobblers.approveGoo({spender: address(gooFarm), amount: type(uint256).max});
-        artGobblers.setApprovalForAll({operator: address(gooFarm), approved: true});
-        gooBalance = artGobblers.gooBalance(ALICE);
-        assertEq(ALICE, artGobblers.ownerOf(gobblerIDs[0]));
-        (address owner, , ) = artGobblers.getGobblerData(1);
+        assertEq(artGobblers.gooBalance(ALICE), artGobblers.gooBalance(N_ALICE));
+        assertEq(artGobblers.getUserEmissionMultiple(ALICE), artGobblers.getUserEmissionMultiple(N_ALICE));
 
-        gooFarm.depositGooOrGobblers({gooAmount: gooBalance, gobblerIDs: gobblerIDs, useERC20Goo: false});
-        vm.stopPrank();
+        depositEverything(ALICE, aGobblers);
 
         // >> 1 year
         vm.warp(block.timestamp + 365 days);
 
-        console.log("Alice: \t", getTotalGooBalance(ALICE) + getGobblersGooInFarm(gobblerIDs));
+        console.log("Alice: \t", getTotalGooBalance(ALICE) + getGobblersGooInFarm(aGobblers));
         console.log("NAlice: \t", getTotalGooBalance(N_ALICE));
     }
 
-    function testBasicGobblerMint() public {
-        uint256 aliceMul = 10;
-        uint256 bobMul = 20;
-        vm.prank(ALICE);
-        artGobblers.mintGobbler(aliceMul);
-        vm.prank(BOB);
-        artGobblers.mintGobbler(bobMul);
-
-        logBalances(ALICE, "Alice");
-        logBalances(BOB, "Bob");
-
-        // Both grow GOO over 1 year
-        vm.warp(block.timestamp + 365 days);
-
-        logBalances(ALICE, "Alice");
-        logBalances(BOB, "Bob");
-
-        // Alice withdraws GOO to ERC20, another year passes
-        vm.startPrank(ALICE);
-        // artGobblers.removeGoo(artGobblers.gooBalance(ALICE));
-        artGobblers.removeGoo(artGobblers.gooBalance(ALICE));
-        vm.warp(block.timestamp + 365 days);
-
-        logBalances(ALICE, "Alice");
-        logBalances(BOB, "Bob");
-    }
-
-    // TEST UTILS
+    /*//////////////////////////////////////////////////////////////
+                                TEST UTILS
+    //////////////////////////////////////////////////////////////*/
 
     function logBalances(address user, string memory name) public view {
         console.log(name, ":");
@@ -170,5 +166,27 @@ contract GooFarmTest is Test {
         for (uint256 i = 0; i < gobblerIDs.length; i++) {
             gooBalance += gooFarm.gooEarnedByGobbler(gobblerIDs[i]);
         }
+    }
+
+    // Deposits all a users gobblers and goo to the farm
+    function depositEverything(address user, uint256[] memory gobblerIDs) internal {
+        vm.startPrank(user);
+        artGobblers.approveGoo({spender: address(gooFarm), amount: type(uint256).max});
+        artGobblers.setApprovalForAll({operator: address(gooFarm), approved: true});
+        gooFarm.depositGobblers({to: user, from: user, gobblerIDs: gobblerIDs});
+        uint256 erc20GooBal = goo.balanceOf(user);
+        if (erc20GooBal > 0) artGobblers.addGoo(erc20GooBal);
+        gooFarm.deposit(artGobblers.gooBalance(user), user, false);
+        vm.stopPrank();
+    }
+
+    // Withdraws all a users gobblers and goo from the farm
+    function withdrawEverything(address user, uint256[] memory gobblerIDs) internal {
+        vm.startPrank(user);
+        gooFarm.withdrawGobblers({to: user, gobblerIDs: gobblerIDs});
+        // uint256 erc20GooBal = goo.balanceOf(user);
+        // if (erc20GooBal > 0) artGobblers.addGoo(erc20GooBal);
+        // gooFarm.deposit(artGobblers.gooBalance(user), user, false);
+        vm.stopPrank();
     }
 }

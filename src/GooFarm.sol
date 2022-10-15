@@ -22,6 +22,7 @@ error NotGobblerOwner();
 
 // TODO add pause function for deposits, keep ownable
 // TODO make sure incompatible functions from 4626 are blocked here
+// TODO Make receipt NFT enumerable to iterate through all staked gobblers
 
 contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     using FixedPointMathLib for uint256;
@@ -62,19 +63,67 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         gobblerPen = _gobblerPen;
     }
 
-    function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
+    /*//////////////////////////////////////////////////////////////
+                            GOBBLER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice External function for depositing gobblers.
+    /// @param from Account to deposit gobblers from.
+    /// @param to Account to send receipt tokens to.
+    /// @param gobblerIDs Array of gobbler IDs to deposit.
+    function depositGobblers(
+        address from,
+        address to,
+        uint256[] calldata gobblerIDs
+    ) external {
+        uint256 len = gobblerIDs.length;
+        uint256 i;
+        for (i; i < len; ) {
+            _depositGobbler(from, to, gobblerIDs[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice External function for withdrawing gobblers,
+    /// and receiving any accrued goo rewards.
+    /// @param to Account to send gobblers and goo to.
+    /// @param gobblerIDs ID of gobbler to withdraw.
+    function withdrawGobblers(address to, uint256[] calldata gobblerIDs) external {
+        uint256 len = gobblerIDs.length;
+        uint256 i;
+        for (i; i < len; ) {
+            _withdrawGobbler(to, gobblerIDs[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            GOO FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    // TODO support ERC20 goo with optional flag
+    function deposit(
+        uint256 assets,
+        address receiver,
+        bool usingERC20
+    ) public returns (uint256 shares) {
         _updateBalances();
 
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        _depositGoo(msg.sender, assets, true);
+        _depositGoo(msg.sender, assets, usingERC20);
 
         _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
+    // TODO support ERC20 goo with optional flag
     function mint(uint256 shares, address receiver) public override returns (uint256 assets) {
         _updateBalances();
 
@@ -87,41 +136,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
-    // Gives you more control than the ERC4626 functions for GOO
-    // Can do goo directly in emissions mode
-    // TODO split into diff funcs - multicall can achieve this
-    function depositGooOrGobblers(
-        uint256 gooAmount,
-        uint256[] calldata gobblerIDs,
-        bool useERC20Goo
-    ) public {
-        // First handle Gobblers
-        uint256 len = gobblerIDs.length;
-        if (len > 0) {
-            uint256 i;
-            for (i; i < len; ++i) {
-                _depositGobbler(msg.sender, msg.sender, gobblerIDs[i]);
-            }
-        }
-
-        // Then handle Goo
-        if (gooAmount != 0) {
-            uint256 shares = previewDeposit(gooAmount);
-            _depositGoo(msg.sender, gooAmount, useERC20Goo);
-            _mint(msg.sender, shares);
-        }
-    }
-
-    function withdrawGobblers(uint256[] calldata gobblerIDs) public {
-        uint256 len = gobblerIDs.length;
-        if (len > 0) {
-            uint256 i;
-            for (i; i < len; ++i) {
-                _withdrawGobbler(msg.sender, gobblerIDs[i]);
-            }
-        }
-    }
-
+    // TODO support ERC20 goo with optional flag
     function withdraw(
         uint256 assets,
         address receiver,
@@ -153,6 +168,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         asset.safeTransfer(receiver, assets);
     }
 
+    // TODO support ERC20 goo with optional flag
     function redeem(
         uint256 shares,
         address receiver,
@@ -207,6 +223,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         _updateBalances();
 
         stakedGobblers[gobblerID].gobblerGooDebtPerShare = accGooPerGobblerShare;
+
+        // TODO add event
     }
 
     /// @notice Internal logic for withdrawing a gobbler NFT,
@@ -238,6 +256,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         // Send goo
         artGobblers.transferGoo(to, gooToWithdraw);
+
+        // TODO add event
     }
 
     /// @notice Internal logic for depositing goo and recieving xGOO shares
@@ -258,6 +278,8 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
             artGobblers.transferGooFrom(from, address(this), gooAmount);
         }
     }
+
+    function _withdrawGoo() internal {}
 
     // This balance update should be called before any deposits or withdraws
     function _updateBalances() internal {
