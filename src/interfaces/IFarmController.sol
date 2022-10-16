@@ -8,7 +8,7 @@ interface IFarmController {
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
     // ERRORS
-    error GreaterThanScale();
+    error MustBeLessThanScale();
     error NoZeroAddressAllowed();
 
     // WRITE FUNCTIONS
@@ -25,7 +25,9 @@ interface IFarmController {
 
     function treasury() external returns (address);
 
-    function calculateProtocolFee(uint256 _amount) external returns (uint256 fee, uint256 netAmount);
+    function calculateProtocolFee(uint256 _amount) external view returns (uint256 fee, uint256 netAmount);
 
-    function calculateGobblerCut(uint256 _amount) external returns (uint256 gobblerCut);
+    function calculateGobblerCut(uint256 _amount) external view returns (uint256 amountForGobblers);
+
+    function calculateGooCut(uint256 _amount) external view returns (uint256 amountForGoo);
 }

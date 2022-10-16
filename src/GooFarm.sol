@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.16;
 
+import "forge-std/Test.sol";
+
 import {IFarmController} from "./interfaces/IFarmController.sol";
 import {IArtGobblers} from "./interfaces/IArtGobblers.sol";
 import {IGobblerPen} from "./interfaces/IGobblerPen.sol";
@@ -10,6 +12,7 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {ERC721TokenReceiver} from "solmate/tokens/ERC721.sol";
 
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+import {toDaysWadUnsafe} from "solmate/utils/SignedWadMath.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {Ownable2Step} from "openzeppelin/access/Ownable2Step.sol";
 
@@ -19,43 +22,34 @@ error ZeroAddressTreasury();
 error NotGobblerOwner();
 
 // TODO add pause function for deposits, keep ownable
+// TODO make sure incompatible functions from 4626 are blocked here
+// TODO Make receipt NFT enumerable to iterate through all staked gobblers
 
 contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     using FixedPointMathLib for uint256;
     using SafeTransferLib for ERC20;
 
+    uint256 internal constant SCALE = 1e18;
+
+    // EXTERNAL CONTRACTS
     IFarmController public farmController;
     IArtGobblers public artGobblers;
     IGobblerPen public gobblerPen;
 
-    uint256 public protocolBalance; // TODO remove this - fees accrued via xGOO balance in treasury
-    uint256 public gobblersBalance;
-    // Remaining GOO belongs to xGOO holders
+    // FARM ACCOUNTING
+    uint256 public lastUpdateTime; // Last time these global goo vars were updated
+    uint256 public lastFarmGooBalance; // Goo across the entire farm
+    uint256 public lastGobblersGooBalance; // Goo that belongs to Gobbler stakers
+    uint256 public lastTotalFarmMultiple; //TODO maybe
 
-    // TODO struct packing - reads and writes for all slots on updateBalances()
-    struct FarmData {
-        uint256 lastTimestamp;
-        uint256 lastTotalGooBalance;
-        uint256 totalGobblersBalance;
+    // GOBBLER ACCOUNTING
+    uint256 internal accGooPerGobblerShare;
+    struct StakedGobbler {
+        // Prev rewards not claimable relative to `accGooPerGobblerShare` (`rewardDebt` in MasterChef PoolStaker)
+        uint256 gobblerGooDebtPerShare;
+        // Note: No need to store gobblerMultiplier as it doesn't change and can be read on withdraw
     }
-
-    // TODO delete - outdated method
-    struct GobblerDepositData {
-        uint256 lastTimestamp;
-        uint256 totalGobblersBalanceAtDeposit;
-    }
-
-    FarmData public farmData;
-    mapping(uint256 => GobblerDepositData) public gobblerData; // nftID -> data
-
-    // TODO TEST DATA
-    struct GobblerStaking {
-        uint256 lastIndex;
-    }
-    uint256 internal lastUpdate;
-    uint256 internal gobblerSharesPerMultipleIndex = 0;
-    mapping(uint256 => GobblerStaking) public gobblerStakingMap; // id to 'lastIndex'
-    // END
+    mapping(uint256 => StakedGobbler) public stakedGobblers; // nftID -> StakedGobbler
 
     event FeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
@@ -69,23 +63,70 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         farmController = _farmController;
         artGobblers = _artGobblers;
         gobblerPen = _gobblerPen;
-
-        farmData = FarmData(0, block.timestamp, 0);
+        lastUpdateTime = block.timestamp;
     }
 
-    function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
+    /*//////////////////////////////////////////////////////////////
+                            GOBBLER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice External function for depositing gobblers.
+    /// @param from Account to deposit gobblers from.
+    /// @param to Account to send receipt tokens to.
+    /// @param gobblerIDs Array of gobbler IDs to deposit.
+    function depositGobblers(
+        address from,
+        address to,
+        uint256[] calldata gobblerIDs
+    ) external {
+        uint256 len = gobblerIDs.length;
+        uint256 i;
+        for (i; i < len; ) {
+            _depositGobbler(from, to, gobblerIDs[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice External function for withdrawing gobblers,
+    /// and receiving any accrued goo rewards.
+    /// @param to Account to send gobblers and goo to.
+    /// @param gobblerIDs ID of gobbler to withdraw.
+    function withdrawGobblers(address to, uint256[] calldata gobblerIDs) external {
+        uint256 len = gobblerIDs.length;
+        uint256 i;
+        for (i; i < len; ) {
+            _withdrawGobbler(to, gobblerIDs[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            GOO FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    // TODO support ERC20 goo with optional flag
+    function deposit(
+        uint256 assets,
+        address receiver,
+        bool usingERC20
+    ) public returns (uint256 shares) {
         _updateBalances();
 
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        _depositGoo(msg.sender, assets, true);
+        _depositGoo(msg.sender, assets, usingERC20);
 
         _mint(receiver, shares);
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
+    // TODO support ERC20 goo with optional flag
     function mint(uint256 shares, address receiver) public override returns (uint256 assets) {
         _updateBalances();
 
@@ -98,43 +139,7 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
-    // Gives you more control than the ERC4626 functions for GOO
-    // Can do goo directly in emissions mode
-    function depositGooOrGobblers(
-        uint256 gooAmount,
-        uint256[] calldata gobblerIDs,
-        bool useERC20Goo
-    ) public {
-        _updateBalances();
-
-        // Handle Goo deposit
-        if (gooAmount != 0) {
-            uint256 shares = previewDeposit(gooAmount);
-            _depositGoo(msg.sender, gooAmount, useERC20Goo);
-            _mint(msg.sender, shares);
-        }
-
-        uint256 len = gobblerIDs.length;
-        if (len > 0) {
-            uint256 i;
-            for (i; i < len; ++i) {
-                _depositGobbler(msg.sender, msg.sender, gobblerIDs[i]);
-            }
-        }
-    }
-
-    function withdrawGobblers(uint256[] calldata gobblerIDs) public {
-        _updateBalances();
-
-        uint256 len = gobblerIDs.length;
-        if (len > 0) {
-            uint256 i;
-            for (i; i < len; ++i) {
-                _withdrawGobbler(msg.sender, gobblerIDs[i]);
-            }
-        }
-    }
-
+    // TODO support ERC20 goo with optional flag
     function withdraw(
         uint256 assets,
         address receiver,
@@ -150,22 +155,29 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         _updateBalances();
 
-        // TODO skip if fee == 0
-        (uint256 fee, uint256 netShares) = farmController.calculateProtocolFee(shares);
+        uint256 fee;
+        uint256 netShares;
+
+        if (farmController.protocolFee() > 0) {
+            (fee, netShares) = farmController.calculateProtocolFee(shares);
+        } else {
+            (fee, netShares) = (0, shares);
+        }
 
         // Calculate new assets recieved after share fee cut
         assets = previewRedeem(netShares);
 
         _burn(owner, netShares);
 
-        transferFrom(owner, farmController.treasury(), fee);
+        if (fee > 0) transferFrom(owner, farmController.treasury(), fee);
 
         // TODO update to include fee
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
-        asset.safeTransfer(receiver, assets);
+        _withdrawGoo(receiver, assets, false); // TODO consider erc20 flag
     }
 
+    // TODO support ERC20 goo with optional flag
     function redeem(
         uint256 shares,
         address receiver,
@@ -219,10 +231,9 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         // Update farm and gobbler data
         _updateBalances();
 
-        gobblerStakingMap[gobblerID].lastIndex = gobblerSharesPerMultipleIndex;
+        stakedGobblers[gobblerID].gobblerGooDebtPerShare = accGooPerGobblerShare;
 
-        // gobblerData[gobblerID].lastTimestamp = block.timestamp;
-        // gobblerData[gobblerID].totalGobblersBalanceAtDeposit = farmData.totalGobblersBalance;
+        // TODO add event
     }
 
     /// @notice Internal logic for withdrawing a gobbler NFT,
@@ -237,21 +248,13 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         _updateBalances();
 
-        uint256 gooShares = ((gobblerSharesPerMultipleIndex - gobblerStakingMap[gobblerID].lastIndex) * gobblerMultiple) / 1e18;
+        uint256 gooToWithdraw = (gobblerMultiple * (accGooPerGobblerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) /
+            SCALE;
 
-        uint256 gooRewards;
-        if (gooShares > 0) {
-            gooRewards = previewRedeem(gooShares) / 1e18;
-
-            farmData.lastTotalGooBalance -= gooRewards;
-            farmData.totalGobblersBalance -= gooRewards;
-        }
-
-        delete gobblerData[gobblerID];
-
-        // OLD Attempt - delete
-        // uint256 gobblerGooSinceDeposit = farmData.totalGobblersBalance - gobblerData[gobblerID].totalGobblersBalanceAtDeposit;
-        // uint256 gooRewards = (gobblerMultiple * gobblerGooSinceDeposit) / artGobblers.getUserEmissionMultiple(address(this));
+        // Update global farm variables
+        lastFarmGooBalance -= gooToWithdraw;
+        lastGobblersGooBalance -= gooToWithdraw;
+        delete stakedGobblers[gobblerID];
 
         // Burn receipt NFT
         gobblerPen.burnForGooFarm(gobblerID);
@@ -260,7 +263,9 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         artGobblers.transferFrom(address(this), to, gobblerID);
 
         // Send goo
-        artGobblers.transferGoo(to, gooRewards);
+        artGobblers.transferGoo(to, gooToWithdraw);
+
+        // TODO add event
     }
 
     /// @notice Internal logic for depositing goo and recieving xGOO shares
@@ -273,35 +278,127 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         bool usingERC20
     ) internal {
         if (usingERC20) {
-            // asset (in ERC4626 vault) is goo, set in constructor
             asset.transferFrom(from, address(this), gooAmount);
             artGobblers.addGoo(gooAmount);
         } else {
             // TODO update when ArtGobblers PR is finalized
             artGobblers.transferGooFrom(from, address(this), gooAmount);
         }
+
+        lastFarmGooBalance = artGobblers.gooBalance(address(this));
     }
 
-    // This balance update should be called before any goo deposits of withdraws
+    function _withdrawGoo(
+        address to,
+        uint256 gooAmount,
+        bool usingERC20
+    ) internal {
+        if (usingERC20) {
+            artGobblers.removeGoo(gooAmount);
+            asset.transfer(to, gooAmount);
+        } else {
+            // TODO update when ArtGobblers PR is finalized
+            artGobblers.transferGoo(to, gooAmount);
+        }
+
+        lastFarmGooBalance = artGobblers.gooBalance(address(this));
+    }
+
+    // This balance update should be called before any deposits or withdraws
     function _updateBalances() internal {
-        if (lastUpdate == block.timestamp) return;
-
+        if (lastUpdateTime == block.timestamp) return;
+        uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
-        uint256 totalBalanceDiff = currentTotalGoo - farmData.lastTotalGooBalance;
 
+        if (currentTotalGoo == 0) return;
+        uint256 totalBalanceDiff = currentTotalGoo - lastFarmGooBalance;
+
+        // TODO resolve
         uint256 gobblerCut = farmController.calculateGobblerCut(totalBalanceDiff);
+        uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+        uint256 gooCut = timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2;
+        // console.log("in update bal");
+        // console.log("last", lastUpdateTime);
+        // console.log("now", block.timestamp);
+        // console.log(timeElapsedWad);
+        // console.log(artGobblers.gooBalance(address(this)));
+        // console.log(totalBalanceDiff);
+        // console.log(gooCut);
+        // uint256 gobblerCut = totalBalanceDiff - gooCut;
 
-        uint256 newGooSharesForGobblers = previewDeposit(gobblerCut);
+        // Increase goo for gobbler stakers - MasterChef logic
+        // Will revert if Goo deposited with no Gobblers in farm - intended
+        accGooPerGobblerShare = accGooPerGobblerShare + ((gobblerCut * SCALE) / totalFarmMultiple);
 
-        gobblerSharesPerMultipleIndex += (newGooSharesForGobblers * 1e18) / artGobblers.getUserEmissionMultiple(address(this));
-
-        farmData.lastTotalGooBalance += currentTotalGoo;
-        farmData.totalGobblersBalance += gobblerCut;
-        farmData.lastTimestamp = block.timestamp;
+        lastFarmGooBalance = currentTotalGoo;
+        lastGobblersGooBalance += gobblerCut;
+        lastUpdateTime = block.timestamp;
+        lastTotalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
     }
 
-    // Returns total goo attributed to xGOO holders
+    function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
+        // If gobbler not in farm, zero goo earned
+        if (artGobblers.ownerOf(gobblerID) != address(this)) return 0;
+
+        uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
+        uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+        uint256 newGobblerGooPerShare = (farmController.calculateGobblerCut(
+            artGobblers.gooBalance(address(this)) - lastFarmGooBalance
+        ) * SCALE) / totalFarmMultiple;
+
+        return
+            (gobblerMultiple *
+                (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
+    }
+
+    // function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
+    //     // If gobbler not in farm, zero goo earned
+    //     if (artGobblers.ownerOf(gobblerID) != address(this)) return 0;
+
+    //     uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
+    //     uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+
+    //     if (lastUpdateTime == block.timestamp) {
+    //         return (gobblerMultiple * lastGobblersGooBalance) / totalFarmMultiple;
+    //     } else {
+    //         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+    //         uint256 gooCut = timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2;
+    //         uint256 newGobblerGooPerShare = (((artGobblers.gooBalance(address(this)) - lastFarmGooBalance) - gooCut) * SCALE) /
+    //             totalFarmMultiple;
+    //         return
+    //             (gobblerMultiple *
+    //                 (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
+    //     }
+    // }
+
+    // NOTE: Misleading function name
+    // Part of the ERC4626 vault which is only for xGOO holders
+    // This reports the total goo attributable to xGOO holders
+    // But excludes any goo attributable to xGobbler holders
     function totalAssets() public view override returns (uint256) {
-        return farmData.lastTotalGooBalance - farmData.totalGobblersBalance;
+        // We can skip the external contract reads if farmData was updated in this block
+        if (lastUpdateTime == block.timestamp) {
+            return lastFarmGooBalance - lastGobblersGooBalance;
+        } else {
+            // TODO resolve
+            return
+                (lastFarmGooBalance - lastGobblersGooBalance) +
+                farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - lastFarmGooBalance);
+        }
     }
+
+    // function totalAssets() public view override returns (uint256) {
+    //     // We can skip the external contract reads if farmData was updated in this block
+    //     if (lastUpdateTime == block.timestamp) {
+    //         return lastFarmGooBalance - lastGobblersGooBalance;
+    //     } else {
+    //         // TODO resolve
+    //         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+    //         return
+    //             (lastFarmGooBalance - lastGobblersGooBalance) +
+    //             (timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2);
+
+    //         // farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - lastFarmGooBalance);
+    //     }
+    // }
 }

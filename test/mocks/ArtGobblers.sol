@@ -62,6 +62,7 @@ contract ArtGobblers is GobblersERC721 {
         // getUserData[currentIdOwner].lastBalance = uint128(gooBalance(currentIdOwner)); GOO balance not affected
         getUserData[msg.sender].lastTimestamp = uint64(block.timestamp);
         getUserData[msg.sender].emissionMultiple += uint32(multiplier);
+        getUserData[msg.sender].gobblersOwned++;
     }
 
     /*//////////////////////////////////////////////////////////////
