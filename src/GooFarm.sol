@@ -13,6 +13,8 @@ import {ERC721TokenReceiver} from "solmate/tokens/ERC721.sol";
 
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {toDaysWadUnsafe} from "solmate/utils/SignedWadMath.sol";
+import {LibGOO} from "goo-issuance/LibGOO.sol";
+
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {Ownable2Step} from "openzeppelin/access/Ownable2Step.sol";
 
@@ -305,35 +307,38 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     }
 
     // This balance update should be called before any deposits or withdraws
-    function _updateBalances() internal {
+    function _updateBalances() public {
         if (lastUpdateTime == block.timestamp) return;
         uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
 
-        if (currentTotalGoo == 0) return;
-        uint256 totalBalanceDiff = currentTotalGoo - lastFarmGooBalance;
-
-        // TODO resolve
-        uint256 gobblerCut = farmController.calculateGobblerCut(totalBalanceDiff);
+        // if (lastFarmGooBalance > 0) {
+        uint256 totalNewGoo = currentTotalGoo - lastFarmGooBalance;
         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
-        uint256 gooCut = timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2;
-        // console.log("in update bal");
-        // console.log("last", lastUpdateTime);
-        // console.log("now", block.timestamp);
-        // console.log(timeElapsedWad);
-        // console.log(artGobblers.gooBalance(address(this)));
-        // console.log(totalBalanceDiff);
-        // console.log(gooCut);
-        // uint256 gobblerCut = totalBalanceDiff - gooCut;
+        uint256 gobblerBaseCut = LibGOO.computeGOOBalance(lastTotalFarmMultiple, lastGobblersGooBalance, timeElapsedWad);
+
+        uint256 gobblerTotalCut;
+        if (lastFarmGooBalance > 0) {
+            gobblerTotalCut = gobblerBaseCut + ((lastGobblersGooBalance * (totalNewGoo - gobblerBaseCut)) / lastFarmGooBalance);
+        } else {
+            gobblerTotalCut = currentTotalGoo;
+        }
+
+        console.log("\nNew Total Goo Earned");
+        console.log(totalNewGoo);
+        console.log("Gobbler total cut");
+        console.log(gobblerTotalCut);
+        console.log("Goo cut");
+        console.log(totalNewGoo - gobblerTotalCut, "\n");
 
         // Increase goo for gobbler stakers - MasterChef logic
         // Will revert if Goo deposited with no Gobblers in farm - intended
-        accGooPerGobblerShare = accGooPerGobblerShare + ((gobblerCut * SCALE) / totalFarmMultiple);
-
+        accGooPerGobblerShare += ((gobblerTotalCut * SCALE) / totalFarmMultiple);
         lastFarmGooBalance = currentTotalGoo;
-        lastGobblersGooBalance += gobblerCut;
+        lastGobblersGooBalance += gobblerTotalCut;
+        // }
         lastUpdateTime = block.timestamp;
-        lastTotalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+        lastTotalFarmMultiple = totalFarmMultiple;
     }
 
     function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
