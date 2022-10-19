@@ -370,26 +370,6 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
                 (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
     }
 
-    // function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
-    //     // If gobbler not in farm, zero goo earned
-    //     if (artGobblers.ownerOf(gobblerID) != address(this)) return 0;
-
-    //     uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
-    //     uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
-
-    //     if (lastUpdateTime == block.timestamp) {
-    //         return (gobblerMultiple * lastGobblersGooBalance) / totalFarmMultiple;
-    //     } else {
-    //         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
-    //         uint256 gooCut = timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2;
-    //         uint256 newGobblerGooPerShare = (((artGobblers.gooBalance(address(this)) - lastFarmGooBalance) - gooCut) * SCALE) /
-    //             totalFarmMultiple;
-    //         return
-    //             (gobblerMultiple *
-    //                 (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
-    //     }
-    // }
-
     // NOTE: Misleading function name
     // Part of the ERC4626 vault which is only for xGOO holders
     // This reports the total goo attributable to xGOO holders
@@ -399,25 +379,22 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         if (lastUpdateTime == block.timestamp) {
             return lastFarmGooBalance - lastGobblersGooBalance;
         } else {
-            // TODO FIX THIS!!!
-            return
-                (lastFarmGooBalance - lastGobblersGooBalance) +
-                farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - lastFarmGooBalance);
+            uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+            uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
+            uint256 totalNewGoo = currentTotalGoo - lastFarmGooBalance;
+            uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+            uint256 gobblerBaseCut = LibGOO.computeGOOBalance(lastTotalFarmMultiple, lastGobblersGooBalance, timeElapsedWad);
+            uint256 gobblerTotalCut;
+
+            if (lastFarmGooBalance > 0) {
+                gobblerTotalCut =
+                    gobblerBaseCut +
+                    ((lastGobblersGooBalance * (totalNewGoo - gobblerBaseCut)) / lastFarmGooBalance);
+            } else {
+                gobblerTotalCut = currentTotalGoo;
+            }
+
+            return lastFarmGooBalance - (lastGobblersGooBalance + gobblerTotalCut);
         }
     }
-
-    // function totalAssets() public view override returns (uint256) {
-    //     // We can skip the external contract reads if farmData was updated in this block
-    //     if (lastUpdateTime == block.timestamp) {
-    //         return lastFarmGooBalance - lastGobblersGooBalance;
-    //     } else {
-    //         // TODO resolve
-    //         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
-    //         return
-    //             (lastFarmGooBalance - lastGobblersGooBalance) +
-    //             (timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2);
-
-    //         // farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - lastFarmGooBalance);
-    //     }
-    // }
 }
