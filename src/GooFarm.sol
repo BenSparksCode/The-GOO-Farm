@@ -347,9 +347,23 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
         uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
-        uint256 newGobblerGooPerShare = (farmController.calculateGobblerCut(
-            artGobblers.gooBalance(address(this)) - lastFarmGooBalance
-        ) * SCALE) / totalFarmMultiple;
+        uint256 newGobblerGooPerShare;
+
+        if (lastUpdateTime != block.timestamp) {
+            uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
+            uint256 totalNewGoo = currentTotalGoo - lastFarmGooBalance;
+            uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+            uint256 gobblerBaseCut = LibGOO.computeGOOBalance(lastTotalFarmMultiple, lastGobblersGooBalance, timeElapsedWad);
+            uint256 gobblerTotalCut;
+            if (lastFarmGooBalance > 0) {
+                gobblerTotalCut =
+                    gobblerBaseCut +
+                    ((lastGobblersGooBalance * (totalNewGoo - gobblerBaseCut)) / lastFarmGooBalance);
+            } else {
+                gobblerTotalCut = currentTotalGoo;
+            }
+            newGobblerGooPerShare = (gobblerTotalCut * SCALE) / totalFarmMultiple;
+        }
 
         return
             (gobblerMultiple *
