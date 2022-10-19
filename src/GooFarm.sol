@@ -13,6 +13,8 @@ import {ERC721TokenReceiver} from "solmate/tokens/ERC721.sol";
 
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {toDaysWadUnsafe} from "solmate/utils/SignedWadMath.sol";
+import {LibGOO} from "goo-issuance/LibGOO.sol";
+
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 import {Ownable2Step} from "openzeppelin/access/Ownable2Step.sol";
 
@@ -305,35 +307,38 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
     }
 
     // This balance update should be called before any deposits or withdraws
-    function _updateBalances() internal {
+    function _updateBalances() public {
         if (lastUpdateTime == block.timestamp) return;
         uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
         uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
 
-        if (currentTotalGoo == 0) return;
-        uint256 totalBalanceDiff = currentTotalGoo - lastFarmGooBalance;
-
-        // TODO resolve
-        uint256 gobblerCut = farmController.calculateGobblerCut(totalBalanceDiff);
+        // if (lastFarmGooBalance > 0) {
+        uint256 totalNewGoo = currentTotalGoo - lastFarmGooBalance;
         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
-        uint256 gooCut = timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2;
-        // console.log("in update bal");
-        // console.log("last", lastUpdateTime);
-        // console.log("now", block.timestamp);
-        // console.log(timeElapsedWad);
-        // console.log(artGobblers.gooBalance(address(this)));
-        // console.log(totalBalanceDiff);
-        // console.log(gooCut);
-        // uint256 gobblerCut = totalBalanceDiff - gooCut;
+        uint256 gobblerBaseCut = LibGOO.computeGOOBalance(lastTotalFarmMultiple, lastGobblersGooBalance, timeElapsedWad);
+
+        uint256 gobblerTotalCut;
+        if (lastFarmGooBalance > 0) {
+            gobblerTotalCut = gobblerBaseCut + ((lastGobblersGooBalance * (totalNewGoo - gobblerBaseCut)) / lastFarmGooBalance);
+        } else {
+            gobblerTotalCut = currentTotalGoo;
+        }
+
+        console.log("\nNew Total Goo Earned");
+        console.log(totalNewGoo);
+        console.log("Gobbler total cut");
+        console.log(gobblerTotalCut);
+        console.log("Goo cut");
+        console.log(totalNewGoo - gobblerTotalCut, "\n");
 
         // Increase goo for gobbler stakers - MasterChef logic
         // Will revert if Goo deposited with no Gobblers in farm - intended
-        accGooPerGobblerShare = accGooPerGobblerShare + ((gobblerCut * SCALE) / totalFarmMultiple);
-
+        accGooPerGobblerShare += ((gobblerTotalCut * SCALE) / totalFarmMultiple);
         lastFarmGooBalance = currentTotalGoo;
-        lastGobblersGooBalance += gobblerCut;
+        lastGobblersGooBalance += gobblerTotalCut;
+        // }
         lastUpdateTime = block.timestamp;
-        lastTotalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+        lastTotalFarmMultiple = totalFarmMultiple;
     }
 
     function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
@@ -342,34 +347,28 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
 
         uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
         uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
-        uint256 newGobblerGooPerShare = (farmController.calculateGobblerCut(
-            artGobblers.gooBalance(address(this)) - lastFarmGooBalance
-        ) * SCALE) / totalFarmMultiple;
+        uint256 newGobblerGooPerShare;
+
+        if (lastUpdateTime != block.timestamp) {
+            uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
+            uint256 totalNewGoo = currentTotalGoo - lastFarmGooBalance;
+            uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+            uint256 gobblerBaseCut = LibGOO.computeGOOBalance(lastTotalFarmMultiple, lastGobblersGooBalance, timeElapsedWad);
+            uint256 gobblerTotalCut;
+            if (lastFarmGooBalance > 0) {
+                gobblerTotalCut =
+                    gobblerBaseCut +
+                    ((lastGobblersGooBalance * (totalNewGoo - gobblerBaseCut)) / lastFarmGooBalance);
+            } else {
+                gobblerTotalCut = currentTotalGoo;
+            }
+            newGobblerGooPerShare = (gobblerTotalCut * SCALE) / totalFarmMultiple;
+        }
 
         return
             (gobblerMultiple *
                 (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
     }
-
-    // function gooEarnedByGobbler(uint256 gobblerID) public view returns (uint256) {
-    //     // If gobbler not in farm, zero goo earned
-    //     if (artGobblers.ownerOf(gobblerID) != address(this)) return 0;
-
-    //     uint256 gobblerMultiple = artGobblers.getGobblerEmissionMultiple(gobblerID);
-    //     uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
-
-    //     if (lastUpdateTime == block.timestamp) {
-    //         return (gobblerMultiple * lastGobblersGooBalance) / totalFarmMultiple;
-    //     } else {
-    //         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
-    //         uint256 gooCut = timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2;
-    //         uint256 newGobblerGooPerShare = (((artGobblers.gooBalance(address(this)) - lastFarmGooBalance) - gooCut) * SCALE) /
-    //             totalFarmMultiple;
-    //         return
-    //             (gobblerMultiple *
-    //                 (accGooPerGobblerShare + newGobblerGooPerShare - stakedGobblers[gobblerID].gobblerGooDebtPerShare)) / SCALE;
-    //     }
-    // }
 
     // NOTE: Misleading function name
     // Part of the ERC4626 vault which is only for xGOO holders
@@ -380,25 +379,22 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
         if (lastUpdateTime == block.timestamp) {
             return lastFarmGooBalance - lastGobblersGooBalance;
         } else {
-            // TODO resolve
-            return
-                (lastFarmGooBalance - lastGobblersGooBalance) +
-                farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - lastFarmGooBalance);
+            uint256 totalFarmMultiple = artGobblers.getUserEmissionMultiple(address(this));
+            uint256 currentTotalGoo = artGobblers.gooBalance(address(this));
+            uint256 totalNewGoo = currentTotalGoo - lastFarmGooBalance;
+            uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
+            uint256 gobblerBaseCut = LibGOO.computeGOOBalance(lastTotalFarmMultiple, lastGobblersGooBalance, timeElapsedWad);
+            uint256 gobblerTotalCut;
+
+            if (lastFarmGooBalance > 0) {
+                gobblerTotalCut =
+                    gobblerBaseCut +
+                    ((lastGobblersGooBalance * (totalNewGoo - gobblerBaseCut)) / lastFarmGooBalance);
+            } else {
+                gobblerTotalCut = currentTotalGoo;
+            }
+
+            return lastFarmGooBalance - (lastGobblersGooBalance + gobblerTotalCut);
         }
     }
-
-    // function totalAssets() public view override returns (uint256) {
-    //     // We can skip the external contract reads if farmData was updated in this block
-    //     if (lastUpdateTime == block.timestamp) {
-    //         return lastFarmGooBalance - lastGobblersGooBalance;
-    //     } else {
-    //         // TODO resolve
-    //         uint256 timeElapsedWad = uint256(toDaysWadUnsafe(block.timestamp - lastUpdateTime));
-    //         return
-    //             (lastFarmGooBalance - lastGobblersGooBalance) +
-    //             (timeElapsedWad.mulWadDown((lastTotalFarmMultiple * lastFarmGooBalance * SCALE).sqrt()) / 2);
-
-    //         // farmController.calculateGooCut(artGobblers.gooBalance(address(this)) - lastFarmGooBalance);
-    //     }
-    // }
 }
