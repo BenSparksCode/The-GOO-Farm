@@ -397,4 +397,10 @@ contract GooFarm is ERC4626, Ownable2Step, ERC721TokenReceiver {
             return lastFarmGooBalance - (lastGobblersGooBalance + gobblerTotalCut);
         }
     }
+
+    function _gobblerGooEarnedSinceLastUpdate() internal returns (uint256) {
+        // TODO implement
+        // Return 0 if block.timestamp == lastUpdateTime
+        // - or maybe dont, would already be skipped where this is called
+    }
 }
